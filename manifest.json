@@ -1,0 +1,12 @@
+{
+  "display_name": "yek命运织机",
+  "loading_order": 200,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "yek",
+  "version": "0.5.1",
+  "auto_update": true,
+  "minimum_client_version": "1.12.0"
+}
