@@ -1331,6 +1331,32 @@ function viewAdd() {
         }
         return h;
     })();    const xpHtml = (function () {
+    const impHtml = (function () {
+        const cards = listCharCards();
+        if (!cards.length) return '';
+        const info = state.importInfo;
+        let h = '<div class="ac-card"><div class="h">从别的角色卡导入</div>' +
+            '<div class="hint" style="margin-bottom:10px">把另一张角色卡（她绑定的世界书）里的人物搬到当前世界书。' +
+            '每个人生成一套新条目，原书不动。</div>' +
+            '<div class="ac-f"><label>来源角色卡</label><select id="ac-imp-card">' +
+            cards.map(function (c) {
+                const sel = (info && info.card && String(info.card.i) === String(c.i)) ? ' selected' : '';
+                return '<option value="' + c.i + '"' + sel + '>' + esc(c.name) + '　（' + esc(c.book) + '）</option>';
+            }).join('') + '</select></div>' +
+            '<button class="ac-btn" id="ac-imp-scan">读取人物</button>';
+        if (info) {
+            const pend = (info.chars || []).filter(function (x2) { return !x2.exists; });
+            h += '<div class="hint" style="margin-top:10px">读到 ' + (info.chars || []).length + ' 个角色，其中 ' + pend.length + ' 个当前书里没有。</div>';
+            h += (info.chars || []).map(function (x2) {
+                const on = (state.importPick || {})[x2.name] !== false && !x2.exists;
+                return '<label class="ac-row" style="gap:8px;cursor:pointer"><input type="checkbox" data-imp="' + esc(x2.name) + '"' + (on ? ' checked' : '') + (x2.exists ? ' disabled' : '') + ' />' +
+                    '<span class="c">' + esc(x2.name) + (x2.exists ? ' <span class="tag">已有</span>' : '') + '</span>' +
+                    '<span class="n">' + x2.count + ' 条 · ' + x2.chars + ' 字</span></label>';
+            }).join('');
+            if (pend.length) h += '<div style="margin-top:10px"><button class="ac-btn pri" id="ac-imp-run">全部生成并写入（' + pend.length + ' 人）</button></div>';
+        }
+        return h + '</div>';
+    })();
         const sel = s.xpPool || [];
         let h = '<details class="ac-xp"' + (sel.length ? ' open' : '') + '>';
         h += '<summary>性癖池　<span class="cnt">已选 ' + sel.length + ' 个</span></summary>';
@@ -1420,6 +1446,8 @@ function viewAdd() {
         </div>
         ${xpHtml}
 
+        ${impHtml}
+
         <button class="ac-btn pri big" id="ac-analyze"><i class="fa-solid fa-wand-magic-sparkles"></i> 分析（先预览，不写入）</button>
         <div class="ac-msg" id="ac-msg"></div>
       </div>
@@ -1428,6 +1456,49 @@ function viewAdd() {
 }
 
 function wireAdd() {
+    // 从别的角色卡导入
+    $('ac-imp-scan')?.addEventListener('click', async function () {
+        const sel = $('ac-imp-card');
+        const idx = sel ? sel.value : '';
+        const prog = toastProgress('正在读取来源世界书…');
+        try {
+            const info = await scanImportBook(idx);
+            state.importInfo = info;
+            state.importPick = {};
+            prog.acDone('读到 ' + info.chars.length + ' 个角色');
+            render();
+        } catch (e) {
+            prog.acDone('读取失败：' + (e.message || e), 8000);
+        }
+    });
+    document.querySelectorAll('[data-imp]').forEach(function (box) {
+        box.addEventListener('change', function () {
+            state.importPick = state.importPick || {};
+            state.importPick[box.dataset.imp] = !!box.checked;
+        });
+    });
+    $('ac-imp-run')?.addEventListener('click', async function () {
+        const info = state.importInfo;
+        if (!info) return;
+        const names = (info.chars || []).filter(function (x) {
+            return !x.exists && (state.importPick || {})[x.name] !== false;
+        }).map(function (x) { return x.name; });
+        if (!names.length) { toast('没有选中任何人', null, 4000); return; }
+        if (!confirm('会为 ' + names.length + ' 个人各生成一套条目写入「' + effectiveBook() + '」，每人 1 次请求。继续吗？')) return;
+        const prog = toastProgress('正在导入 ' + names.length + ' 个角色…');
+        progNote = function (m) { if (prog && prog.acUpdate) prog.acUpdate(m); };
+        try {
+            const r = await runImport(names);
+            prog.acDone('导入完成：成功 ' + r.done.length + ' 个' + (r.failed.length ? '，失败 ' + r.failed.length + ' 个' : ''));
+            if (r.failed.length) console.warn('[命运织机] 导入失败明细', r.failed);
+            state.importInfo = null;
+            await refreshDirCache();
+            render();
+        } catch (e) {
+            prog.acDone('导入失败：' + (e.message || e), 8000);
+        } finally { progNote = function () {}; }
+    });
+
     const s = settings();
     $('ac-seg')?.querySelectorAll('[data-src]').forEach(d => d.addEventListener('click', () => {
         s.source = d.dataset.src; persist();
@@ -1498,6 +1569,8 @@ function wireAdd() {
 }
 
 // ── 右上角浮动提示 ───────────────────────────────
+let progNote = function (m) { try { console.log('[命运织机] ' + m); } catch (e) {} };
+
 function toast(desc, onView, ms) {
     let box = document.getElementById('ac-toasts');
     if (!box) {
@@ -2610,6 +2683,82 @@ function wireApi() {
     });
 }
 
+// ═══════════════════════════════════════════════════════════
+// 从别的角色卡导入人物：一次把另一个世界书里的角色搬过来
+// ═══════════════════════════════════════════════════════════
+function listCharCards() {
+    try {
+        const c = live();
+        const arr = (c.characters || []).map(function (ch, i) {
+            const book = (ch && ch.data && ch.data.extensions && ch.data.extensions.world) || '';
+            return { i: i, name: (ch && ch.name) || ('角色卡 ' + i), book: String(book) };
+        });
+        return arr.filter(function (x) { return x.book; });
+    } catch (e) { return []; }
+}
+
+// 读某张角色卡绑定的世界书里有哪些人物
+async function scanImportBook(cardIndex) {
+    const cards = listCharCards();
+    const card = cards.find(function (x) { return String(x.i) === String(cardIndex); });
+    if (!card) throw new Error('这张角色卡没有绑定世界书');
+
+    const chars = await listCharacters(card.book);
+    const target = effectiveBook();
+    let have = [];
+    if (target && target !== card.book) {
+        try {
+            const t = await listCharacters(target);
+            have = t.map(function (x) { return x.name; });
+        } catch (e) { /* 目标书读不到就算了 */ }
+    }
+    return {
+        card: card,
+        chars: chars.map(function (x) {
+            return {
+                name: x.name,
+                count: x.count,
+                chars: x.chars,
+                entries: x.entries,
+                exists: have.some(function (n) { return n === x.name || n.indexOf(x.name) >= 0 || x.name.indexOf(n) >= 0; }),
+            };
+        }),
+    };
+}
+
+// 把选中的这些人逐个生成并写入当前世界书
+async function runImport(names) {
+    const info = state.importInfo;
+    if (!info) throw new Error('先读取人物');
+    const target = effectiveBook();
+    if (!target) throw new Error('先选目标世界书');
+    if (target === info.card.book) throw new Error('目标和来源是同一本世界书');
+
+    const picked = (info.chars || []).filter(function (x) { return names.indexOf(x.name) >= 0; });
+    if (!picked.length) throw new Error('没有选中任何人');
+
+    const done = [];
+    const failed = [];
+    for (let i = 0; i < picked.length; i++) {
+        const c = picked[i];
+        progNote('正在处理「' + c.name + '」（' + (i + 1) + '/' + picked.length + '）');
+        try {
+            const plan = await generatePlan({
+                book: target,
+                name: c.name,
+                aliases: [],
+                idea: settings().idea,
+                source: 'entries',
+                existing: c.entries,
+            });
+            await writePlan(target, plan);
+            done.push(c.name);
+        } catch (e) {
+            failed.push(c.name + '：' + (e.message || e));
+        }
+    }
+    return { done: done, failed: failed };
+}
 // ── 更新已有角色 ─────────────────────────────────
 async function viewUpdate() {
     const book = effectiveBook() || state.books[0];
@@ -3553,6 +3702,7 @@ function runDirector() {
             ].filter(Boolean).join(String.fromCharCode(10));
             ctx.setExtensionPrompt(DIR_KEY, text2, pos, depth, true, 0);
             state.dirLast = { at: Date.now(), name: sg.name, text: text2, gap: 0, by: "llm" };
+    try { renderDirStatus(); } catch (e) {}
             state.dirSuggestion = null;
             console.log("[命运织机] 导演（模型判断）：" + sg.name);
             toastDirector('llm', sg.name, 0);
@@ -3571,6 +3721,7 @@ function runDirector() {
             const mt = directorMildText(res.pick);
             ctx.setExtensionPrompt(DIR_KEY, mt, pos, depth, true, 0);
             state.dirLast = { at: Date.now(), name: res.pick.name, text: mt, gap: res.pick.gap, by: "mild" };
+    try { renderDirStatus(); } catch (e) {}
             console.log("[命运织机] 导演轻提：" + res.pick.name + "（" + res.pick.gap + " 楼未出场，只提及不出场）");
             toastDirector('mild', res.pick.name, res.pick.gap);
             return;
@@ -3584,6 +3735,7 @@ function runDirector() {
         if (!text) { clearDirector(); return; }
         ctx.setExtensionPrompt(DIR_KEY, text, pos, depth, true, 0);
         state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap, by: "script" };
+    try { renderDirStatus(); } catch (e) {}
         console.log("[命运织机] 导演：推荐 " + res.pick.name + "（" + res.pick.gap + " 楼未出场，场景词命中）");
         toastDirector('script', res.pick.name, res.pick.gap);
     } catch (err) {
@@ -3867,6 +4019,7 @@ function wireDirector() {
         if (!res.pick) { if (m) { m.className = 'ac-msg err'; m.textContent = '没有可推荐的人'; } return; }
         const text = directorText(res);
         state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap };
+    try { renderDirStatus(); } catch (e) {}
         if (m) { m.className = 'ac-msg ok'; m.textContent = '这一轮会推荐：' + res.pick.name; }
         render();
     });
@@ -4071,6 +4224,7 @@ async function onCharacterSwitched() {
     state.dirCache = null;
     state.bookFix = null;
     state.dirLast = null;
+    try { renderDirStatus(); } catch (e) {}
 
     if (s.director && s.targetBook) {
         try { await refreshDirCache(); } catch (e) { console.warn("[命运织机] 切书后读素材失败", e); }
@@ -4108,11 +4262,59 @@ function watchCharacter() {
 // ═══════════════════════════════════════════════════════════
 // 主页面浮动小面板：不用每次去开魔杖菜单
 // ═══════════════════════════════════════════════════════════
+// 导演状态显示：这一轮安排了谁
+function dirStatusHtml() {
+    const last = state.dirLast;
+    if (!last) {
+        return '<div class="mini-e" style="padding:10px 12px">这一轮导演还没出手。<br>点「预测」看看它打算怎么安排。</div>';
+    }
+    if (last.name === null || last.name === '') {
+        return '<div class="mini-e" style="padding:10px 12px;color:#8fa0a0">本轮不推荐任何人' +
+            (last.why ? '（' + esc(last.why) + '）' : '') + '</div>';
+    }
+    const kind = last.by === 'mild' ? '轻提' : (last.by === 'llm' ? '出场（模型判断）' : '出场');
+    const color = last.by === 'mild' ? '#8fd9b6' : '#ffd479';
+    return '<div style="padding:10px 12px;line-height:1.7">' +
+        '<div><b style="color:' + color + '">' + esc(last.name) + '</b>' +
+        '<span style="font-size:11px;color:#6f8080;margin-left:6px">' + kind + '</span></div>' +
+        (last.gap ? '<div style="font-size:11px;color:#6f8080">已经 ' + last.gap + ' 楼没出场</div>' : '') +
+        '</div>';
+}
+
+// 只算不注入：预测这一轮会安排谁
+function previewDirector() {
+    try {
+        const r = directorPick();
+        if (!r) return { why: '素材还没读，先去导演页点「重新读取」' };
+        if (r.skip) return { why: r.why || '当前不适合安排出场' };
+        if (!r.pick) return { why: '这一轮没有合适的人' };
+        return {
+            name: r.pick.name,
+            by: 'script',
+            gap: r.pick.gap,
+            scenes: r.pick.scenes || [],
+            hit: r.pick.hit || [],
+            hint: r.pick.hint || '',
+        };
+    } catch (e) {
+        return { why: '算不出来：' + (e.message || e) };
+    }
+}
+
+function renderDirStatus() {
+    const box = document.getElementById('ac-mini-dir');
+    if (box) box.innerHTML = dirStatusHtml();
+}
 function ensureMini() {
     if (document.getElementById("ac-mini")) return;
     const d = document.createElement("div");
     d.id = "ac-mini";
     d.innerHTML = '<div id="ac-mini-body" style="display:none">' +
+        '<div class="mini-h"><span>导演</span><b id="ac-mini-kind" style="color:#8fa0a0;font-weight:400;font-size:11px;margin-right:6px"></b></div>' +
+        '<div id="ac-mini-dir"></div>' +
+        '<div style="display:flex;gap:6px;padding:0 12px 10px">' +
+        '<button class="ac-btn" id="ac-mini-predict" style="flex:1 1 auto;padding:5px 8px;font-size:12px">预测这一轮</button>' +
+        '</div>' +
         '<div class="mini-h"><span>角色清单</span><b id="ac-mini-book" style="color:#8fa0a0;font-weight:400;font-size:11px;margin-right:6px"></b><b id="ac-mini-n">0/0</b>' +
         '<button id="ac-mini-x" title="收起">×</button></div>' +
         '<div class="mini-l" id="ac-mini-list"></div>' +
@@ -4126,7 +4328,7 @@ function ensureMini() {
         const b = document.getElementById("ac-mini-body");
         const open = b.style.display === "none";
         b.style.display = open ? "block" : "none";
-        if (open) renderMini(true);
+        if (open) { renderMini(true); renderDirStatus(); }
     });
     document.getElementById("ac-mini-x").addEventListener("click", function () {
         document.getElementById("ac-mini-body").style.display = "none";
@@ -4134,6 +4336,17 @@ function ensureMini() {
     document.getElementById("ac-mini-open").addEventListener("click", function () {
         document.getElementById("ac-mini-body").style.display = "none";
         openPanel();
+    });
+    document.getElementById("ac-mini-predict").addEventListener("click", function () {
+        const r = previewDirector();
+        const box = document.getElementById("ac-mini-dir");
+        if (box) box.innerHTML = r.name
+            ? ('<div style="padding:10px 12px;line-height:1.7"><div><b style="color:#ffd479">' + esc(r.name) + '</b>' +
+               '<span style="font-size:11px;color:#6f8080;margin-left:6px">会安排出场</span></div>' +
+               (r.gap ? '<div style="font-size:11px;color:#6f8080">已经 ' + r.gap + ' 楼没出场</div>' : '') +
+               (r.hit && r.hit.length ? '<div style="font-size:11px;color:#6f8080">命中：' + esc(r.hit.join('、')) + '</div>' : '') +
+               (r.hint ? '<div style="font-size:11px;color:#6f8080;margin-top:4px">' + esc(r.hint) + '</div>' : '') + '</div>')
+            : ('<div class="mini-e" style="padding:10px 12px">' + esc(r.why || '这一轮不安排出场') + '</div>');
     });
     document.getElementById("ac-mini-reload").addEventListener("click", async function () {
         const b = document.getElementById("ac-mini-list");
@@ -4155,6 +4368,7 @@ async function renderMini(needCache) {
     const chars = (state.dirCache && state.dirCache.chars) || [];
     const on = chars.filter(function (c) { return c.enabled !== false; }).length;
     if (cnt) cnt.textContent = String(on);
+    renderDirStatus();
     const bk = document.getElementById("ac-mini-book");
     if (bk) bk.textContent = effectiveBook() || '(未选书)';
     if (num) num.textContent = on + "/" + chars.length;
