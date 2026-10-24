@@ -964,6 +964,12 @@ async function detectCandidates(force) {
                 if (w) { useBook = w; console.log('[命运织机] 没选目标书，自动使用角色卡绑定的：' + w); }
             } catch (e) { /* ignore */ }
         }
+        if (!useBook) {
+            state.detecting = false;
+            state.detectError = '还没选目标世界书 —— 不知道哪本书里已经有哪些人，就无法判断谁是「新人物」。先去「2. 目标世界书」选一本。';
+            if (state.tab === 'add') render();
+            return;
+        }
         state.existingNames = new Set();
         if (useBook) {
             try {
@@ -984,7 +990,19 @@ async function detectCandidates(force) {
             const _lc4 = live(); if (_lc4.name2) state.existingNames.add(String(_lc4.name2));
         } catch (e) { /* ignore */ }
         for (const dr of (state.drafts || [])) if (dr.name) state.existingNames.add(String(dr.name));
-        const existing = [...state.existingNames].slice(0, 200).join('、');
+
+        // 关键：把「识别出来的人名」也算已有。
+        // 条目名可能是「神乐绫音（人设核心）」这种，模型看到「神乐绫音」就以为是新人；
+        // 用和出场导演同一套识别结果，能得到干净的人名。
+        try {
+            const cache = await refreshDirCache(useBook);
+            for (const ch of (cache.chars || [])) {
+                if (ch && ch.name) state.existingNames.add(String(ch.name));
+            }
+            if ((cache.chars || []).length) console.log('[命运织机] 已有角色 ' + cache.chars.length + ' 个，检测时会排除');
+        } catch (e) { console.warn('[命运织机] 读取已有角色失败', e); }
+
+        const existing = [...state.existingNames].slice(0, 300).join('、');
 
         // 顺带让模型挑一个本轮该出场的人（复用同一次请求，不额外花钱）
         let castBlock = '';
@@ -1028,8 +1046,11 @@ async function detectCandidates(force) {
             .filter(c => {
                 const n = String(c.name).trim();
                 if (!n) return false;
-                if (state.existingNames.has(n)) return false;
-                for (const x of state.existingNames) { if (x && x.indexOf(n) >= 0) return false; }
+                if (state.existingNames.has(n)) { console.log('[命运织机] 跳过已有角色：' + n); return false; }
+                for (const x of state.existingNames) {
+                    if (!x || x.length < 2) continue;
+                    if (x.indexOf(n) >= 0 || n.indexOf(x) >= 0) { console.log('[命运织机] 跳过已有角色：' + n + '（对上「' + x + '」）'); return false; }
+                }
                 return true;
             })
             .slice(0, 10)
@@ -1352,7 +1373,19 @@ function viewAdd() {
     const s = settings();
     const cv = state.candidates || [];
     const dr = state.drafts || [];
-    const okDrafts = dr.filter(x => x.plan);
+    const okDrafts = dr.filter(x => x.plan).map(function (x) {
+        // 她已经在这本书里了？过期草稿或重复检测时要能看出来
+        let dup = false;
+        try {
+            const names = state.existingNames;
+            if (names && names.size) {
+                dup = [...names].some(function (e2) {
+                    return e2 && e2.length >= 2 && (e2.indexOf(x.name) >= 0 || x.name.indexOf(e2) >= 0);
+                });
+            }
+        } catch (e2) {}
+        return Object.assign({}, x, { dup: dup });
+    });
     const banner = (function () {
         let h = '';
         if (state.genBusy) {
@@ -1361,10 +1394,13 @@ function viewAdd() {
             h += '<div class="ac-card"><div class="h">检测到 ' + okDrafts.length + ' 个可添加人物（模板已生成）' +
                 '<span class="i" style="cursor:pointer" id="ac-redetect">重新检测</span></div>';
             h += okDrafts.map((x, i) =>
-                '<div class="ac-draft"><span class="tag">已生成</span><span class="nm">' + esc(x.name) + (x.unnamed ? ' <span class="tag">未命名</span>' : '') + '</span>' +
+                '<div class="ac-draft"><span class="tag">' + (x.dup ? '书里已有' : '已生成') + '</span><span class="nm">' + esc(x.name) + (x.unnamed ? ' <span class="tag">未命名</span>' : '') + '</span>' +
                 '<button class="ac-btn" data-load="' + i + '">查看/编辑</button></div>').join('');
             const errs = dr.filter(x => x.error);
             if (errs.length) h += errs.map(x => '<div class="ac-warn">⚠ ' + esc(x.name) + ' 生成失败：' + esc(x.error) + '</div>').join('');
+            if (okDrafts.some(x => x.dup)) {
+                h += '<div class="hint" style="color:#ffb4b4">标「书里已有」的那几个，目标世界书里本来就有她 —— 别再加一份，点「重新检测」清掉。</div>';
+            }
             h += '<div class="hint">点「查看/编辑」把模板载入下面的编辑区。</div></div>';
         } else if (state.detecting) {
             h += '<div class="ac-card"><div class="h">正在检测可添加人物…</div></div>';
