@@ -2685,6 +2685,7 @@ async function viewUpdate() {
             '<button class="ac-btn pri" id="ac-upd-run">重新分析</button>' +
             '<button class="ac-btn" id="ac-upd-upgrade" style="margin-left:8px">升级成织机格式</button>' +
             '<div class="ac-msg" id="ac-upd-msg"></div></div>';
+    }
     // 就地更新：直接改她原本那一条，不改格式
     const curC = chars.find(function (x) { return x.name === picked; });
     if (curC && (curC.entries || []).length) {
@@ -2693,22 +2694,28 @@ async function viewUpdate() {
         for (const en of curC.entries) {
             h += '<div class="ac-row"><span class="c">' + esc(en.comment) + '</span>' +
                 '<span class="n">' + String(en.content || "").length + ' 字</span>' +
-                '<button class="ac-btn" data-rewrite="' + esc(String(en.__uid)) + '" style="padding:4px 10px;font-size:12px">更新这条</button></div>';
+                '<button class="ac-btn" data-rewrite="' + esc(String(en.__uid)) + '" style="padding:4px 10px;font-size:12px">更新这条</button>' +
+                '<button class="ac-btn" data-append="' + esc(String(en.__uid)) + '" style="padding:4px 10px;font-size:12px;margin-left:6px">追加更新</button></div>';
         }
         h += '</div>';
-    }
     }
 
     if (state.rewrite) {
         const r = state.rewrite;
-        h += '<div class="ac-card"><div class="h">更新预览：' + esc(r.comment) + '</div>' +
+        h += '<div class="ac-card"><div class="h">' + (r.mode === 'append' ? '追加预览：' : '更新预览：') + esc(r.comment) + '</div>' +
+            (r.mode === 'append'
+                ? '<div class="hint">原文 ' + r.oldLen + ' 字（不改） + 新补 ' + (r.appendedLen || 0) + ' 字 → 共 ' + r.newLen + ' 字</div>' +
+                  '<div class="hint" style="color:#8fd9b6;margin-top:6px">原文完整保留，只在末尾追加一段「【补充】」。可以撤销。</div>'
+                : '') +
             '<div class="hint">旧 ' + r.oldLen + ' 字 → 新 ' + r.newLen + ' 字（' + Math.round((r.ratio || 1) * 100) + '%）</div>' +
             (r.short ? '<div class="hint" style="color:#ff7a7a;margin-top:6px">⚠ 新内容只有原文的 ' + Math.round((r.ratio || 1) * 100) + '%，很可能是模型偷懒压缩了。' +
                 '直接写入会丢掉大部分原文。建议先把它补回来，或者点取消。</div>' : '') +
             '<textarea id="ac-rw-text" style="width:100%;height:240px;margin-top:10px">' + esc(r.neu) + '</textarea>' +
-            '<div class="hint" style="color:#ffd479;margin-top:8px">⚠ 写入会<b>覆盖这一条的正文</b>。条目名、关键词、顺序都不变；旧的正文会被记下来，可以撤销。</div>' +
+            (r.mode === 'append'
+                ? '<div class="hint" style="color:#8fd9b6;margin-top:8px">不会覆盖任何内容，只在末尾追加。可以撤销。</div>'
+                : '<div class="hint" style="color:#ffd479;margin-top:8px">⚠ 写入会<b>覆盖这一条的正文</b>。条目名、关键词、顺序都不变；旧的正文会被记下来，可以撤销。</div>') +
             '<div style="display:flex;gap:8px;margin-top:10px">' +
-            '<button class="ac-btn pri" id="ac-rw-apply">' + (r.short ? '仍然写入（会丢内容）' : '写入这条') + '</button>' +
+            '<button class="ac-btn pri" id="ac-rw-apply">' + (r.mode === 'append' ? '追加进去' : (r.short ? '仍然写入（会丢内容）' : '写入这条')) + '</button>' +
             '<button class="ac-btn" id="ac-rw-new">另存为新条目</button>' +
             '<button class="ac-btn" id="ac-rw-cancel">取消</button></div></div>';
         h += '<div style="margin-top:8px"><button class="ac-btn" id="ac-rw-undo">撤销上次写入</button></div>';
@@ -2763,6 +2770,9 @@ function wireUpdate() {
     });
     $('ac-upd-apply')?.addEventListener('click', applyUpdate);
     $('ac-upd-upgrade')?.addEventListener('click', function () { runUpgrade(); });
+    document.querySelectorAll('[data-append]').forEach(function (btn) {
+        btn.addEventListener('click', function () { runAppend(btn.dataset.append); });
+    });
     document.querySelectorAll('[data-rewrite]').forEach(function (btn) {
         btn.addEventListener('click', function () { runRewrite(btn.dataset.rewrite); });
     });
@@ -2833,7 +2843,7 @@ async function runRewrite(uid) {
 
         const ratio = oldLen ? (txt.length / oldLen) : 1;
         state.rewrite = {
-            uid: target.uid, comment: target.comment,
+            uid: (target.uid != null ? target.uid : target.__uid), comment: target.comment,
             old: oldText, neu: txt, take: true,
             oldLen: oldLen, newLen: txt.length, ratio: ratio,
             short: (oldLen > 200 && ratio < 0.6),
@@ -2847,6 +2857,56 @@ async function runRewrite(uid) {
     }
 }
 
+// 追加更新：只生成「原文里还没有的新细节」，拼在原文后面
+const APPEND_SYSTEM = [
+  '你在给一条已经写好的世界书条目补充新信息。',
+  '',
+  '【铁律】',
+  '1. 只输出原文里还没有的新细节。原文已经写过的，一个字都不要重复。',
+  '2. 输出是「增补片段」，不是重写全文。通常 150~600 字，最多不超过原文长度的 60%。',
+  '3. 用原文同样的写法和语气，不要加标题、不要加编号、不要说明「以下是补充」。',
+  '4. 素材里没提到的不要编造；和原文冲突的，以素材为准并写明变化。',
+  '5. 直接输出片段正文。',
+].join('\n');
+
+async function runAppend(uid) {
+    const c = state.updateChar;
+    if (!c) return;
+    const ent = (c.entries || []).find(function (e) { return String(e.__uid) === String(uid) || String(e.comment) === String(uid); });
+    const target = ent || (c.entries || [])[0];
+    if (!target) { toast("找不到这条条目", null, 4000); return; }
+
+    const oldText = String(target.content || "");
+    const prog = toastProgress("正在给「" + target.comment + "」补内容…");
+    try {
+        let chatPart = "";
+        try {
+            const hits = gatherFromChat(c.name, []);
+            if (hits.length) chatPart = NL2 + "【新的正文素材】" + NL2 + hits.slice(-20).map(function (h) { return (h.isUser ? "【玩家】" : "【正文】") + h.text; }).join(NL2).slice(0, 6000);
+        } catch (e) { /* 没有就算了 */ }
+
+        const prompt = APPEND_SYSTEM + NL2 + NL2 +
+            "【条目名】" + target.comment + NL2 + NL2 +
+            "【条目原文（已经写过这些，不要重复）】" + NL2 + oldText + chatPart + NL2 + NL2 +
+            "请只输出需要新增的细节片段。";
+
+        const raw = await callLLM(prompt);
+        let txt = String(raw || "").trim();
+        txt = txt.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/, "").trim();
+
+        state.rewrite = {
+            uid: (target.uid != null ? target.uid : target.__uid), comment: target.comment, mode: "append",
+            old: oldText, neu: txt, take: true,
+            oldLen: oldText.length, newLen: oldText.length + txt.length,
+            appendedLen: txt.length,
+            ratio: 1, short: false,
+        };
+        prog.acDone("已生成增补片段：" + txt.length + " 字，原文不动");
+        render();
+    } catch (e) {
+        prog.acDone("生成失败：" + (e.message || e), 8000);
+    }
+}
 async function undoRewrite() {
     const u = state.rewriteUndo;
     if (!u) throw new Error('没有可撤销的更新');
@@ -2871,6 +2931,19 @@ async function applyRewrite(mode) {
     const prog = toastProgress("正在写入…");
     try {
         const data = await getBook(book);
+        if (mode === "append") {
+            const entA = Object.values(data.entries || {}).find(function (e) { return String(e.uid) === String(r.uid); });
+            if (!entA) throw new Error("这条条目已经不在了");
+            const beforeA = String(entA.content || "");
+            entA.content = beforeA + NL2 + "【补充】" + NL2 + r.neu;
+            state.rewriteUndo = { uid: entA.uid, comment: String(entA.comment || ""), old: beforeA, at: Date.now() };
+            await putBook(book, data);
+            state.rewrite = null;
+            await refreshDirCache();
+            prog.acDone("已补进「" + r.comment + "」：" + beforeA.length + " → " + String(entA.content).length + " 字");
+            render();
+            return;
+        }
         if (mode === "new") {
             // 另存为新条目，原文不动
             const ent0 = Object.values(data.entries || {}).find(function (e) { return String(e.uid) === String(r.uid); });
