@@ -1043,35 +1043,37 @@ async function detectCandidates(force) {
 
 // 从世界书里找出已存在的角色（靠条目名反推）
 async function listCharacters(book) {
+    // 和「出场导演」用同一套识别逻辑，不再各写一份（否则会漏人、重复）
+    const cache = await refreshDirCache(book);
     const data = await getBook(book);
     const es = Object.values(data.entries || {});
-    const names = new Set();
-    for (const e of es) {
-        const c = String(e.comment || "");
-        let m = c.match(/^角色卡 (.+)$/);
-        if (m) { names.add(m[1].trim()); continue; }
-        m = c.match(/^(?:NSFW档案|身体配置|性癖档案) (.+)$/);
-        if (m) { names.add(m[1].trim()); continue; }
-        m = c.match(/^(.+)_行为落地指南$/);
-        if (m) { names.add(m[1].trim()); continue; }
-        m = c.match(/^(.+)_出场时机$/);
-        if (m) names.add(m[1].trim());
-    }
+    const scanChars = (((settings().dirScan || {})[book] || {}).chars) || [];
+
     const out = [];
-    const srcOf = function (n) {
-        const hit = llmNames.get(n);
-        if (hit) return 'LLM';
-        if ((settings().directorCharsExtra || []).indexOf(n) >= 0) return '手动';
-        if (vals.some(function (e) { return String(e.comment) === '角色卡 ' + n || String(e.comment) === 'NSFW档案 ' + n; })) return '角色卡';
-        if (namePri.get(n) === 4) return '关系速览';
-        if (namePri.get(n) === 2) return '行动路线';
-        return '条目名';
-    };
-    for (const n of names) {
+    for (const ch of ((cache && cache.chars) || [])) {
+        const n = ch.name;
+        const scanHit = scanChars.find(function (x) { return x && x.name === n; });
+        const llmEntries = (scanHit && Array.isArray(scanHit.entries)) ? scanHit.entries.map(String) : [];
+        // 把条目名还原成「主名」：去掉 角色卡 / NSFW档案 前缀和 _行为落地指南 后缀
+        const subjOf = function (c) {
+            let s2 = String(c || "").replace(/^(?:角色卡|NSFW档案|身体配置|性癖档案)\s*/, "");
+            s2 = s2.replace(/_(?:行为落地指南|出场时机)$/, "");
+            return s2.trim();
+        };
         const mine = es.filter(function (e) {
             const c = String(e.comment || "");
-            return c === "角色卡 " + n || c === "NSFW档案 " + n || c === "身体配置 " + n || c === "性癖档案 " + n || c === n + "_行为落地指南" || c === n + "_出场时机";
+            if (llmEntries.indexOf(c) >= 0) return true;
+            if (/^(TavernDB|ACU-)/i.test(c)) return false;
+            const sj = subjOf(c);
+            if (!sj) return false;
+            if (sj === n) return true;
+            // 互相包含也算同一个（夏梦 ↔ 魅魔母亲夏梦）
+            if (sj.indexOf(n) >= 0 || n.indexOf(sj) >= 0) return true;
+            // 「柳玉性格补充」「浅草-猫妖-（人设核心）」这类：名字后面跟分隔符
+            if (c.length > n.length && c.indexOf(n) === 0 && /^[\s_\-—（(【\[]/.test(c.slice(n.length))) return true;
+            return false;
         });
+        if (!mine.length) continue;
         out.push({
             name: n,
             count: mine.length,
@@ -2837,8 +2839,8 @@ async function llmScanCharacters(force) {
     return { cached: false, chars: chars, scanned: lines.length };
 }
 // 从世界书里抽出每个角色的场景词和出现方式（缓存用，异步）
-async function refreshDirCache() {
-    const book = settings().targetBook;
+async function refreshDirCache(forBook) {
+    const book = forBook || settings().targetBook;
     if (!book) { state.dirCache = null; return null; }
     const data = await getBook(book);
     const vals = Object.values(data.entries || {});
@@ -2931,6 +2933,15 @@ async function refreshDirCache() {
         if (!dup) keptNames.push(nm9);
     }
     const names = new Set(keptNames);
+    // 这个名字是从哪儿认出来的（显示在界面上，方便判断该不该勾）
+    const srcOf = function (n) {
+        if (llmNames.get(n)) return 'LLM';
+        if ((settings().directorCharsExtra || []).indexOf(n) >= 0) return '手动';
+        if (vals.some(function (e) { return String(e.comment) === '角色卡 ' + n || String(e.comment) === 'NSFW档案 ' + n; })) return '角色卡';
+        if (namePri.get(n) === 4) return '关系速览';
+        if (namePri.get(n) === 2) return '行动路线';
+        return '条目名';
+    };
     for (const n of names) {
         let scenes = [];
         let hint = '';
@@ -3603,6 +3614,80 @@ function wireBackups() {
         render();
     });
 }
+// ═══════════════════════════════════════════════════════════
+// 主页面浮动小面板：不用每次去开魔杖菜单
+// ═══════════════════════════════════════════════════════════
+function ensureMini() {
+    if (document.getElementById("ac-mini")) return;
+    const d = document.createElement("div");
+    d.id = "ac-mini";
+    d.innerHTML = '<div id="ac-mini-body" style="display:none">' +
+        '<div class="mini-h"><span>角色清单</span><b id="ac-mini-n">0/0</b>' +
+        '<button id="ac-mini-x" title="收起">×</button></div>' +
+        '<div class="mini-l" id="ac-mini-list"></div>' +
+        '<div class="mini-f"><button class="ac-btn" id="ac-mini-open">打开完整面板</button>' +
+        '<button class="ac-btn" id="ac-mini-reload">重新读取</button></div></div>' +
+        '<div id="ac-mini-btn" title="yek命运织机"><i class="fa-solid fa-user-pen"></i>' +
+        '<span id="ac-mini-count">0</span></div>';
+    document.body.appendChild(d);
+
+    document.getElementById("ac-mini-btn").addEventListener("click", function () {
+        const b = document.getElementById("ac-mini-body");
+        const open = b.style.display === "none";
+        b.style.display = open ? "block" : "none";
+        if (open) renderMini(true);
+    });
+    document.getElementById("ac-mini-x").addEventListener("click", function () {
+        document.getElementById("ac-mini-body").style.display = "none";
+    });
+    document.getElementById("ac-mini-open").addEventListener("click", function () {
+        document.getElementById("ac-mini-body").style.display = "none";
+        openPanel();
+    });
+    document.getElementById("ac-mini-reload").addEventListener("click", async function () {
+        const b = document.getElementById("ac-mini-list");
+        if (b) b.innerHTML = '<div class="mini-e">读取中…</div>';
+        try { await refreshDirCache(); } catch (e) { console.warn("[命运织机] 读取失败", e); }
+        renderMini(true);
+    });
+    renderMini(false);
+}
+
+async function renderMini(needCache) {
+    const list = document.getElementById("ac-mini-list");
+    const cnt = document.getElementById("ac-mini-count");
+    const num = document.getElementById("ac-mini-n");
+    if (!list) return;
+    if (needCache && !state.dirCache) {
+        try { await refreshDirCache(); } catch (e) { /* 忽略 */ }
+    }
+    const chars = (state.dirCache && state.dirCache.chars) || [];
+    const on = chars.filter(function (c) { return c.enabled !== false; }).length;
+    if (cnt) cnt.textContent = String(on);
+    if (num) num.textContent = on + "/" + chars.length;
+    if (!chars.length) {
+        list.innerHTML = '<div class="mini-e">还没有素材。先选目标世界书，或点下面的「重新读取」。</div>';
+        return;
+    }
+    list.innerHTML = chars.map(function (c) {
+        const chk = c.enabled !== false ? " checked" : "";
+        const tag = c.npc ? "数据库" : (c.source || "");
+        return '<label class="mini-r"><input type="checkbox" data-mpick="' + esc(c.name) + '"' + chk + ' />' +
+            '<span class="mini-n">' + esc(c.name) + '</span>' +
+            '<span class="mini-t">' + esc(tag) + '</span></label>';
+    }).join("");
+    list.querySelectorAll("[data-mpick]").forEach(function (box) {
+        box.addEventListener("change", async function () {
+            const st = settings();
+            st.directorPick = st.directorPick || {};
+            st.directorPick[box.dataset.mpick] = !!box.checked;
+            persist();
+            await refreshDirCache();
+            renderMini(false);
+            if (state.tab === "director") render();
+        });
+    });
+}
 // ── 挂载 ─────────────────────────────────────────
 jQuery(async () => {
     try { state.books = await listBooks(); } catch (e) { console.warn('[命运织机] 读列表失败', e); }
@@ -3657,5 +3742,6 @@ jQuery(async () => {
     } catch (e) { console.warn('[命运织机] 事件挂载失败', e); }
 
     ensurePanel();
+    try { ensureMini(); } catch (e) { console.warn('[命运织机] 浮动小面板创建失败', e); }
     console.log('[命运织机] v0.6.0 已加载 · 世界书 ' + state.books.length + ' 本');
 });
