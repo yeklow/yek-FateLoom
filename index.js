@@ -3359,9 +3359,15 @@ async function refreshDirCache(forBook) {
     const namePri = new Map();
     const markerNames = new Set();
     const addName = function (raw, pri) {
-        const nm0 = cleanName(raw);
+        let nm0 = cleanPersonName(cleanName(raw));
         if (!nm0) return;
         if (/^(TavernDB|ACU-)/i.test(nm0)) return;
+        // 「师尊额外设定 / 清月师尊-BASE / 奶衣-师伯」——先摘掉尾巴再取主名
+        nm0 = nm0.replace(/(额外设定|额外|补充设定|补充|附加设定|设定|底子|基础|模板)$/, "").trim();
+        nm0 = nm0.replace(/[-_—·].*$/, "").trim();
+        if (!nm0) return;
+        if (junkPersonName(nm0)) return;
+        if (nm0.length < 2 || nm0.length > 8) return;
         const cur = namePri.get(nm0);
         if (cur === undefined || pri > cur) namePri.set(nm0, pri);
     };
@@ -3405,7 +3411,7 @@ async function refreshDirCache(forBook) {
         // ① 「名字（备注）」—— 最常见的写法：苏芊语（母亲）/ 顾婉清（青梅）/ 凌晓（小混混）
         const pr = c.match(/^\s*([\u4e00-\u9fa5A-Za-z]{2,4})\s*[（(]\s*([^）)]{1,10})\s*[)）]\s*$/);
         if (pr) {
-            const NOISE = /世界观|背景|体态|体型|文风|判断|设定|规则|说明|系统|地图|地理|时间|关系|概要|简介|总结|提示|格式|顺序|插入|深度|概率|语料|其他|备注|序章|开场|结局|尺寸|参数|选项|状态|数值|衣着|穿着|样例|示例|模板|参考/i;
+            const NOISE = /世界观|背景|体态|体型|文风|判断|设定|规则|说明|系统|地图|地理|时间|关系|概要|简介|总结|提示|格式|顺序|插入|深度|概率|语料|其他|备注|序章|开场|结局|尺寸|参数|选项|状态|数值|衣着|穿着|样例|示例|模板|参考|插图|状态栏|列表|额外|权限|正文|美化|纯文字|加强版|吐槽|速览|附录|规则|玩法|机制|教程|帮助/i;
             if (!NOISE.test(pr[1]) && !NOISE.test(pr[2])) { addName(pr[1], 3); markerNames.add(pr[1]); continue; }
         }
         // ② 显式标记：浅草-猫妖-（人设核心） / 玉藻 人设核心 / 白练华（身体设定）
@@ -3420,6 +3426,18 @@ async function refreshDirCache(forBook) {
         m = c.match(/^(.+?)[_\-—]?(?:行为落地指南|出场时机|介入机会)$/);
         if (m) { addName(m[1], 2); continue; }
         if (/人设|核心|设定/.test(c)) addName(c.split(/[_\-—（(【[]/)[0], 1);
+        // ⑦ 兜底：奶衣-师伯 / 玄音仙子-闺蜜 / 疏影-地灵 这种「名字-身份」
+        //    取分隔符前面那段当人名（「闺蜜」「师伯」「地灵」是身份不是名字）
+        const cs = cleanPersonName(c);
+        const segs = cs.split(/[-_—·]/).map(function (x) { return x.trim(); }).filter(Boolean);
+        if (segs.length >= 2 && /^[\u4e00-\u9fa5]{2,5}$/.test(segs[0]) && !junkPersonName(segs[0])) {
+            addName(segs[0], 1);
+            continue;
+        }
+        // ⑧ 再兜底：条目自己的关键词第一个（奶衣 / 玄音 / 青萝 / 疏影）
+        //    只认「出现在条目名里」的关键词，否则会把 尾巴 / 敏感度 这种也当成人名
+        const kk = (e.key || []).map(String).filter(function (x) { return x && !junkPersonName(x) && cs.indexOf(x) >= 0; });
+        if (kk.length && /^[\u4e00-\u9fa5]{2,4}$/.test(kk[0])) addName(kk[0], 1);
     }
 
     if (tl) {
@@ -4328,6 +4346,29 @@ function wireBackups() {
 // 一键修复世界书：让导演能认出这些人
 // ═══════════════════════════════════════════════════════════
 // 判断一个条目是不是属于某个角色
+// 条目名里常带 emoji / 装饰符号（⚙️SFW插图列表、🙍‍♀️奶衣-师伯、🥰清月师尊🥰）
+// 不去掉的话，名字会只剩一个 emoji，甚至被当成两个人
+const NAME_DECOR = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}]/gu;
+const NAME_NOISE = /敏感度|敏感|等级|评级|程度|评分|概率|数值|属性|参数|外部导入|导入|导出|日志|记录|存档|备份|反应|回复|选项|开关|父亲|母亲|爸爸|妈妈|老爸|老妈|父母|叔叔|阿姨|舅舅|姑妈|哥哥|姐姐|弟弟|妹妹|儿子|女儿|老公|老婆|妻子|丈夫|推特|推文|微博|微信|论坛|网站|平台|洞天|福地|秘境|大陆|王国|帝国|门派|宗门|世家|家族|组织|公司|学校|医院|地图|境界|功法|法宝|世界观|背景|体态|体型|文风|判断|设定|规则|说明|系统|地图|地理|时间|关系|概要|简介|总结|提示|格式|顺序|插入|深度|概率|语料|其他|备注|序章|开场|结局|尺寸|参数|选项|状态栏|数值|衣着|穿着|样例|示例|模板|参考|插图|列表|额外|权限|正文|美化|纯文字|加强版|吐槽|速览|附录|玩法|机制|教程|帮助|BASE|SFW|NSFW/i;
+const NAME_JUNK = /^(旧版写法\d*|新版写法\d*|默认美化|纯文字|加强版|可选|必开|必关|不插图则关|不插则关)$/;
+function cleanPersonName(s) {
+    let n = String(s == null ? '' : s).replace(NAME_DECOR, '').trim();
+    n = n.replace(/^[\(\[（【]?(旧版写法|新版写法)[\d\s]*[\)\]）】]?\s*/i, '');
+    n = n.replace(/^[\s\-_—·、,，:：]+|[\s\-_—·、,，:：]+$/g, '');
+    return n.trim();
+}
+// 不是人名的：纯符号、太短、命中装饰词、NG 里的配置类
+// 地名/境界尾巴：清月谷、天岚山、九幽城
+const PLACE_TAIL = /[谷山城岛湖峰宫殿寺庙馆院街巷港州国界境池林原野海]{1}$/;
+function junkPersonName(s) {
+    const n = cleanPersonName(s);
+    if (!n) return true;
+    if (NAME_JUNK.test(n)) return true;
+    if (!/[\u4e00-\u9fa5A-Za-z]{2,}/.test(n)) return true;   // 没有任何两个连续中日韩/拉丁字 → 扔掉
+    if (NAME_NOISE.test(n)) return true;                      // 插图列表 / 状态栏 / 规则 / 设定 这类配置条目
+    if (n.length >= 3 && PLACE_TAIL.test(n)) return true;     // 三个字以上、以地名尾巴结尾的，基本是地点
+    return false;
+}
 function entryBelongsTo(comment, name) {
     const c = String(comment || '');
     if (!c || !name) return false;
