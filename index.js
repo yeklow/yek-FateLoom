@@ -2871,6 +2871,7 @@ async function refreshDirCache(forBook) {
         if (cur === undefined || pri > cur) namePri.set(nm0, pri);
     };
 
+    let rosterFound = false;
     // 最高可信（5）：LLM 扫过的结果
     const scanned = (settings().dirScan || {})[book];
     const llmNames = new Map();
@@ -2888,6 +2889,7 @@ async function refreshDirCache(forBook) {
     for (const rn of ROSTER_NAMES) {
         const re0 = vals.find(function (e) { return String(e.comment) === rn; });
         if (!re0) continue;
+        rosterFound = true;
         const body0 = String(re0.content || '');
         // 只取【关系网】之前的部分（那是成对关系，不是名单）
         const cut0 = body0.indexOf('【关系网');
@@ -3114,7 +3116,7 @@ async function refreshDirCache(forBook) {
         ch.enabled = (picks[ch.name] !== undefined) ? !!picks[ch.name] : !ch.npc;
     }
 
-    state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, npcSkipped: 0, at: Date.now() };
+    state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, rosterFound: rosterFound, npcSkipped: 0, at: Date.now() };
     return state.dirCache;
 }
 
@@ -3422,6 +3424,13 @@ function viewDirector() {
         '<button class="ac-btn" id="ac-pick-all">全选主要</button>' +
         '<button class="ac-btn" id="ac-pick-none">全不选</button>' +
         '</div>' +
+        '<div style="display:flex;gap:6px;margin:10px 0 4px">' +
+        '<input type="text" id="ac-pick-add" placeholder="手动加一个名字（例如 柳玉）" style="flex:1 1 auto" />' +
+        '<button class="ac-btn" id="ac-pick-addbtn">添加</button>' +
+        '</div>' +
+        ((settings().directorCharsExtra || []).length ? '<div class="hint" style="margin-bottom:8px">已手动添加：' + (settings().directorCharsExtra || []).map(function (x) { return esc(x) + ' <a href="#" data-delname="' + esc(x) + '" style="color:#e08">×</a>'; }).join('、') + '</div>' : '') +
+        '<div class="hint" id="ac-pick-msg" style="margin-bottom:8px">自动认不出来的人，在这里手填。' +
+        '填完会按名字去世界书里找她的条目（包含匹配，所以填「柳玉」能找到「柳玉性格补充」）。</div>' +
         '<div style="max-height:300px;overflow:auto">' +
         allChars.map(function (c) {
             const on = c.enabled !== false;
@@ -3439,6 +3448,11 @@ function viewDirector() {
             return '<div class="hint" style="margin-top:8px">LLM 上次扫描：' + esc(new Date(sc0.at).toLocaleString()) +
                 '　认出 ' + (sc0.chars || []).length + ' 个角色</div>';
         })() +
+        ((cache && cache.rosterFound === false)
+            ? '<div class="hint" style="margin-top:8px;color:#ffd479">这本书里没找到「人物关系速览」之类的总表。' +
+              '自动识别会退到「角色卡 / 条目名 / 行动路线」这些线索上，可能认不全 —— <b>建议点上面的「LLM 扫描角色」</b>，' +
+              '它会读条目内容判断谁属于谁，命名再乱也能认。</div>'
+            : '') +
         (rows.length ? '<div style="margin-top:12px;font-size:13px;color:#9fb0b0">' +
             rows.slice(0, 20).map(function (c) {
                 return '<div>' + esc(c.name) + '　<span style="color:#6f8080">' + (c.scenes || []).slice(0, 6).join('、') + '</span></div>';
@@ -3489,6 +3503,40 @@ function wireDirector() {
     if (ntf) ntf.addEventListener('change', function () { settings().directorNotify = ntf.checked; persist(); });
     const idle = $('ac-dir-idle');
     if (idle) idle.addEventListener('change', function () { settings().directorIdleOnly = idle.checked; persist(); });
+
+    // 手动添加名字
+    const doAdd = async function () {
+        const box = $('ac-pick-add');
+        const msgEl = $('ac-pick-msg');
+        const nm = String((box && box.value) || '').trim();
+        if (!nm) return;
+        const st = settings();
+        st.directorCharsExtra = st.directorCharsExtra || [];
+        if (st.directorCharsExtra.indexOf(nm) < 0) st.directorCharsExtra.push(nm);
+        persist();
+        const cache = await refreshDirCache();
+        const hit = ((cache && cache.chars) || []).find(function (c) { return c.name === nm; });
+        if (msgEl) msgEl.innerHTML = hit
+            ? ('已加入「' + esc(nm) + '」，匹配到 ' + (hit.keys || []).length + ' 个关键词。')
+            : ('已加入「' + esc(nm) + '」，但世界书里没找到她的条目 —— 导演提到她也不会点亮任何设定。');
+        render();
+        renderMini(false);
+    };
+    $('ac-pick-addbtn')?.addEventListener('click', doAdd);
+    $('ac-pick-add')?.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
+    document.querySelectorAll('[data-delname]').forEach(function (a) {
+        a.addEventListener('click', async function (e) {
+            e.preventDefault();
+            const nm = a.dataset.delname;
+            const st = settings();
+            st.directorCharsExtra = (st.directorCharsExtra || []).filter(function (x) { return x !== nm; });
+            if (st.directorPick) delete st.directorPick[nm];
+            persist();
+            await refreshDirCache();
+            render();
+            renderMini(false);
+        });
+    });
 
     // 角色清单：逐个勾选
     document.querySelectorAll('[data-pick]').forEach(function (box) {
