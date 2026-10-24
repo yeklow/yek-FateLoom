@@ -1331,7 +1331,23 @@ function viewAdd() {
             h += '<div class="hint">点一个名字，自动填进下面的「人物名」。</div></div>';
         }
         return h;
-    })();    const xpHtml = (function () {
+    })();
+const xpHtml = (function () {
+        const sel = s.xpPool || [];
+        let h = '<details class="ac-xp"' + (sel.length ? ' open' : '') + '>';
+        h += '<summary>性癖池　<span class="cnt">已选 ' + sel.length + ' 个</span></summary>';
+        h += allXpGroups().map(function (g) {
+            return '<div class="ac-xpg"><div class="ac-xpg-h">' + g.name + '</div><div class="ac-xpi">' +
+                g.items.map(function (x) {
+                    return '<label class="ac-xpc"><input type="checkbox" data-xp="' + x + '"' +
+                        (sel.indexOf(x) >= 0 ? ' checked' : '') + ' /><span>' + x + '</span></label>';
+                }).join('') + '</div></div>';
+        }).join('');
+        h += '<div class="hint">勾选的会长期保存。每个角色随机抽 1~2 个，且不会和上一个角色重复。</div>';
+        h += '<button class="ac-btn" id="ac-xpclear" style="margin-top:8px;">清空</button>';
+        h += '</details>';
+        return h;
+    })();
     const impHtml = (function () {
         const cards = listCharCards();
         if (!cards.length) return '';
@@ -1361,21 +1377,6 @@ function viewAdd() {
             if (pend.length) h += '<div style="margin-top:10px"><button class="ac-btn pri" id="ac-imp-run">全部生成并写入（' + pend.length + ' 人）</button></div>';
         }
         return h + '</div>';
-    })();
-        const sel = s.xpPool || [];
-        let h = '<details class="ac-xp"' + (sel.length ? ' open' : '') + '>';
-        h += '<summary>性癖池　<span class="cnt">已选 ' + sel.length + ' 个</span></summary>';
-        h += allXpGroups().map(function (g) {
-            return '<div class="ac-xpg"><div class="ac-xpg-h">' + g.name + '</div><div class="ac-xpi">' +
-                g.items.map(function (x) {
-                    return '<label class="ac-xpc"><input type="checkbox" data-xp="' + x + '"' +
-                        (sel.indexOf(x) >= 0 ? ' checked' : '') + ' /><span>' + x + '</span></label>';
-                }).join('') + '</div></div>';
-        }).join('');
-        h += '<div class="hint">勾选的会长期保存。每个角色随机抽 1~2 个，且不会和上一个角色重复。</div>';
-        h += '<button class="ac-btn" id="ac-xpclear" style="margin-top:8px;">清空</button>';
-        h += '</details>';
-        return h;
     })();
     return `
       <h2>添加角色</h2>
@@ -3603,6 +3604,8 @@ function directorPick() {
         return null;
     };
     const recent = texts.slice(-3).join('\n');
+    const lastMsg = texts.slice(-2).join('\n');   // 场景词只在最近两楼里找，避免拿几楼前的词硬凑
+    const PLACE_RX = /厨房|客厅|卧室|浴室|卫生间|澡堂|阳台|玄关|走廊|电梯|楼梯|书房|餐厅|教室|办公室|操场|天台|屋顶|地下室|车库|花园|庭院|便利店|超市|医院|病房|街头|车里|门口|门外/;
     const gapNeed = Math.max(1, Number(s.directorGap) || 8);
 
     // 空闲检测：最近一楼是否在打斗/激烈冲突里
@@ -3632,7 +3635,15 @@ function directorPick() {
         const never = (last < 0);
         // 从没出场过的人不存在「间隔」概念，一律当作最久没出场（否则短聊天里永远轮不到新人）
         const gap = never ? 9999 : (n - 1 - last);
-        const sceneHit = (c.scenes || []).filter(function (w) { return w && recent.indexOf(w) >= 0; });
+        const sceneHit = (c.scenes || []).filter(function (w) {
+            if (!w || lastMsg.indexOf(w) < 0) return false;            // 只在最后一楼里找
+            // 是地点词的话，得和数据库记录的地点对得上（别在电梯里让人从厨房出来）
+            if (PLACE_RX.test(w) && dbPlace) {
+                const okPlace = dbPlace.indexOf(w) >= 0 || w.indexOf(dbPlace) >= 0;
+                if (!okPlace) return false;
+            }
+            return true;
+        });
         // 没有场景词的角色（手写条目常见），退回用她条目的关键词判断
         // 关键词本来就带上下文意味（补习 / 健身房 / 值班），比什么都不做强
         let kwHit = [];
@@ -3724,8 +3735,12 @@ function directorText(res) {
     if (!res || !res.pick) return '';
     const p = res.pick;
     const L = [];
-    L.push('[出场提示] ' + p.name + '（' + p.gap + ' 楼未出场）' + (p.trig && p.trig !== p.name ? '　关键词：' + p.trig : ''));
-    if (p.hit && p.hit.length) L.push('当前场景提到了：' + p.hit.join('、') + '，适合让她介入。');
+    const gapTxt = (p.never || p.gap >= 9000) ? '还从没出场过' : (p.gap + ' 楼未出场');
+    L.push('[出场提示] ' + p.name + '（' + gapTxt + '）' + (p.trig && p.trig !== p.name ? '　关键词：' + p.trig : ''));
+    if (p.hit && p.hit.length) {
+        const only1 = p.hit.length === 1;
+        L.push('当前场景提到了：' + p.hit.join('、') + (only1 ? '　—— 只有她此刻真的就在那个位置附近，才用这条。' : '，适合让她介入。'));
+    }
     else if ((p.scenes || []).length) L.push('她通常在：' + p.scenes.slice(0, 4).join('、') + '（场景对得上才用）。');
     if (p.hint) L.push('她的出场方式：' + p.hint.slice(0, 90));
     L.push('如果她此刻出现会显得突兀，就完全忽略本提示 —— 宁可这一轮没人出场。');
