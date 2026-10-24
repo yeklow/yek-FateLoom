@@ -363,3 +363,8 @@
 }
 #ac-mini-body .mini-pin:hover { background: #3d4749; color: #dfe6e6; }
 #ac-mini-body .mini-r { display: flex; align-items: center; gap: 6px; }
+/* 标题上的版本号 */
+#ac-head .title .ver {
+  font-size: 11px; color: #7d8f8f; font-weight: 400;
+  margin-left: 7px; letter-spacing: 0.3px;
+}

@@ -6,6 +6,7 @@ import { getContext } from '../../../extensions.js';
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
+const VERSION = '0.6.1';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -1188,7 +1189,7 @@ function ensurePanel() {
       <div id="ac-panel">
         <div id="ac-head">
           <div class="logo">织</div>
-          <div class="title">yek命运织机</div>
+          <div class="title">yek命运织机<span class="ver">v${VERSION}</span></div>
           <button class="hbtn" id="ac-close" title="关闭面板"><i class="fa-solid fa-xmark"></i><span>关闭</span></button>
         </div>
         <div id="ac-body">
@@ -2150,7 +2151,7 @@ async function doAnalyze() {
         renderResult();
         setMsg('分析完成，检查后点下面的「写入世界书」', 'ok');
     } catch (e) {
-        setMsg('失败：' + errBrief(e), 'err');
+        setMsg('失败：' + errBrief(e) + '（版本 ' + VERSION + '，请确认已更新到最新）', 'err');
     } finally {
         if ($('ac-analyze')) $('ac-analyze').disabled = false;
     }
