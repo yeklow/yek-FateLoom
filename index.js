@@ -3705,6 +3705,24 @@ function directorPick() {
         return { skip: true, why: '所有人都在间隔门槛内（' + gapNeed + ' 楼），这一轮不推荐', all: rows };
     }
 
+    // 策略一：指定角色优先 —— 你选的人，只要够久没出场、场景又不在激烈冲突里，就让她出
+    if (s.directorMode === 'pin' && s.directorPin) {
+        const pinName = String(s.directorPin);
+        const pinned = pool.find(function (r) { return r.name === pinName || r.name.indexOf(pinName) >= 0 || pinName.indexOf(r.name) >= 0; });
+        if (pinned) {
+            pinned.strength = 'strong';   // 用户明确指定的人，一律按「请安排」
+            return { pick: pinned, all: rows, byMode: 'pin' };
+        }
+    }
+    // 策略二：久未出场优先 —— 不管有没有线索，谁最久没出现就推谁
+    if (s.directorMode === 'rotate') {
+        const sorted2 = pool.slice().sort(function (a, b) {
+            return b.gap - a.gap || (b.hit || []).length - (a.hit || []).length;
+        });
+        const top2 = sorted2[0];
+        top2.strength = (top2.hit || []).length ? 'strong' : 'middle';   // 没线索但确实很久没出场，用中等强度
+        return { pick: top2, all: rows, byMode: 'rotate' };
+    }
     // 场景命中优先；命中里挑间隔最大的
     const matched = pool.filter(function (r) { return r.hit.length > 0 || (r.relHit || []).length > 0; });
     const chance = s.directorAllowRandom ? Math.max(0, Math.min(100, Number(s.directorChance) || 0)) : 0;
@@ -3779,7 +3797,10 @@ function directorText(res) {
         else L.push('眼下提到了：' + p.hit.join('、') + '—— 只有她确实可能在这个位置附近，才用这条。');
     }
     // 不规定她怎么进场 —— 她的人设会随关键词一起被带进来，由模型自己写
-    if (p.strength === 'strong') {
+    if (p.strength === 'middle') {
+        L.push('她已经很久没露面了，这一轮可以让她出现 —— 具体怎么进场，按她的人设和你这一段的行文写。');
+        L.push('如果实在接不上，就跳过本提示。');
+    } else if (p.strength === 'strong') {
         L.push('这一轮请让她出现在这一段里。她怎么出场、先做了什么、说了什么，按她的人设和你这一段的行文自然写，不要照搬任何固定句式。');
         L.push('除非和正在发生的事直接矛盾（比如人已经离开这个地点），否则不要跳过。');
     } else {
@@ -3947,6 +3968,21 @@ function viewDirector() {
         '<option value="before"' + (s.directorPos === 'before' ? ' selected' : '') + '>主提示词之前</option>' +
         '</select></div>';
     h += '</div>';
+    h += '<div class="ac-f"><label>出场策略</label>' +
+        '<select id="ac-dir-mode" style="margin-bottom:8px">' +
+        '<option value="scene"' + (s.directorMode === 'scene' || !s.directorMode ? ' selected' : '') + '>场景匹配 —— 有线索才让她出（默认）</option>' +
+        '<option value="rotate"' + (s.directorMode === 'rotate' ? ' selected' : '') + '>久未出场优先 —— 谁最久没出现就推谁，不看线索</option>' +
+        '<option value="pin"' + (s.directorMode === 'pin' ? ' selected' : '') + '>指定角色 —— 我选的人优先出场</option>' +
+        '</select>' +
+        '<div class="hint">场景匹配最稳但可能一直推不出人；久未出场最活跃但偶尔突兀；指定角色适合你想让某个人上场的时候。' +
+        '策略只影响「该不该推」，她怎么出场仍然交给模型写。</div></div>';
+    if (s.directorMode === 'pin') {
+        const allC = ((cache && cache.chars) || []).filter(function (c) { return c.enabled !== false; });
+        h += '<div class="ac-f"><label>指定谁优先出场</label><select id="ac-dir-pin">' +
+            '<option value="">（没选）</option>' +
+            allC.map(function (c) { return '<option value="' + esc(c.name) + '"' + (s.directorPin === c.name ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') +
+            '</select><div class="hint">只要她够久没出场、当前又不在激烈冲突里，就会推她。</div></div>';
+    }
     h += '<div class="ac-f"><label>允许新人硬上</label>' +
         '<label class="ac-sw"><input type="checkbox" id="ac-dir-newbie"' + (s.directorNewbie ? ' checked' : '') + ' /><span>开了才推</span></label>' +
         '<div class="hint"><b>默认关。</b>关着时，从没出场过的人只有在她条目关键词出现在正文里才会被推荐。' +
