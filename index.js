@@ -3607,14 +3607,41 @@ function wireBackups() {
 jQuery(async () => {
     try { state.books = await listBooks(); } catch (e) { console.warn('[命运织机] 读列表失败', e); }
 
-    const menu = document.getElementById('extensionsMenu');
-    if (!menu) { console.warn('[命运织机] 找不到 extensionsMenu'); return; }
-    const btn = document.createElement('div');
-    btn.id = 'ac_wand_btn';
-    btn.classList.add('list-group-item', 'flex-container', 'flexGap5');
-    btn.innerHTML = '<div class="fa-solid fa-user-pen extensionsMenuExtensionButton"></div><span>yek命运织机</span>';
-    btn.addEventListener('click', openPanel);
-    menu.appendChild(btn);
+    // 魔杖菜单里加一项。酒馆可能还没建好菜单，所以带重试
+    (function mountMenu(tries) {
+        tries = tries || 0;
+        const menu = document.getElementById('extensionsMenu');
+        if (!menu) {
+            if (tries < 40) return setTimeout(function () { mountMenu(tries + 1); }, 250);
+            console.warn('[命运织机] 等不到 extensionsMenu，仍可用 /ml 或 /织机 打开');
+            return;
+        }
+        if (document.getElementById('ac_wand_btn')) return;
+        const btn = document.createElement('div');
+        btn.id = 'ac_wand_btn';
+        btn.classList.add('list-group-item', 'flex-container', 'flexGap5');
+        btn.innerHTML = '<div class="fa-solid fa-user-pen extensionsMenuExtensionButton"></div><span>yek命运织机</span>';
+        btn.addEventListener('click', openPanel);
+        menu.appendChild(btn);
+        console.log('[命运织机] 已加入魔杖菜单');
+    })();
+
+    // 斜杠命令：不用找菜单也能开
+    try {
+        const SP = ctx.SlashCommandParser, SC = ctx.SlashCommand;
+        if (SP && SC && SC.fromProps) {
+            const mk = function (name, alias, help) {
+                return SP.addCommandObject(SC.fromProps({
+                    name: name,
+                    aliases: alias,
+                    helpString: help,
+                    callback: function () { openPanel(); return ''; },
+                }));
+            };
+            mk('织机', ['ml', 'fateloom'], '打开 yek命运织机面板');
+            console.log('[命运织机] 斜杠命令已注册：/织机  /ml  /fateloom');
+        }
+    } catch (e) { console.warn('[命运织机] 斜杠命令注册失败', e); }
 
     // 对话结束 → 自动检测新人物并生成模板
     try {
