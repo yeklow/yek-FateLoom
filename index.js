@@ -3717,9 +3717,14 @@ function directorPick() {
     // 策略二：久未出场优先 —— 不管有没有线索，谁最久没出现就推谁
     if (s.directorMode === 'rotate') {
         const sorted2 = pool.slice().sort(function (a, b) {
-            return b.gap - a.gap || (b.hit || []).length - (a.hit || []).length;
+            // 有线索的先上（自然），都没线索就谁最久没出场谁上
+            const ha = ((a.hit || []).length * 100) + Math.min(a.gap, 99);
+            const hb = ((b.hit || []).length * 100) + Math.min(b.gap, 99);
+            return hb - ha;
         });
-        const top2 = sorted2[0];
+        // 前几名里随机挑一个，避免每次都同一个人
+        const topN = sorted2.slice(0, Math.min(3, sorted2.length));
+        const top2 = topN[Math.floor(Math.random() * topN.length)];
         top2.strength = (top2.hit || []).length ? 'strong' : 'middle';   // 没线索但确实很久没出场，用中等强度
         return { pick: top2, all: rows, byMode: 'rotate' };
     }
@@ -3970,11 +3975,11 @@ function viewDirector() {
     h += '</div>';
     h += '<div class="ac-f"><label>出场策略</label>' +
         '<select id="ac-dir-mode" style="margin-bottom:8px">' +
-        '<option value="scene"' + (s.directorMode === 'scene' || !s.directorMode ? ' selected' : '') + '>场景匹配 —— 有线索才让她出（默认）</option>' +
-        '<option value="rotate"' + (s.directorMode === 'rotate' ? ' selected' : '') + '>久未出场优先 —— 谁最久没出现就推谁，不看线索</option>' +
+        '<option value="rotate"' + (s.directorMode !== 'pin' ? ' selected' : '') + '>轮流出场 —— 谁最久没出现就推谁（有线索的先上）</option>' +
         '<option value="pin"' + (s.directorMode === 'pin' ? ' selected' : '') + '>指定角色 —— 我选的人优先出场</option>' +
         '</select>' +
-        '<div class="hint">场景匹配最稳但可能一直推不出人；久未出场最活跃但偶尔突兀；指定角色适合你想让某个人上场的时候。' +
+        '<div class="hint">轮流出场：有场景线索的人优先，没有线索就推最久没出现的那个（前几名随机）。' +
+        '指定角色：你选的人只要够久没出场、场景又不激烈，就推她。' +
         '策略只影响「该不该推」，她怎么出场仍然交给模型写。</div></div>';
     if (s.directorMode === 'pin') {
         const allC = ((cache && cache.chars) || []).filter(function (c) { return c.enabled !== false; });
@@ -3983,10 +3988,6 @@ function viewDirector() {
             allC.map(function (c) { return '<option value="' + esc(c.name) + '"' + (s.directorPin === c.name ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') +
             '</select><div class="hint">只要她够久没出场、当前又不在激烈冲突里，就会推她。</div></div>';
     }
-    h += '<div class="ac-f"><label>允许新人硬上</label>' +
-        '<label class="ac-sw"><input type="checkbox" id="ac-dir-newbie"' + (s.directorNewbie ? ' checked' : '') + ' /><span>开了才推</span></label>' +
-        '<div class="hint"><b>默认关。</b>关着时，从没出场过的人只有在她条目关键词出现在正文里才会被推荐。' +
-        '打开后，实在没人对得上时会推一个还从没出场的人 —— 提示里仍然写着「突兀就忽略」，由模型判断。</div></div>';
     h += '<div class="ac-f" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:660px">' +
         '<label style="margin:0">只在空闲场景出手</label>' +
         '<label class="ac-sw"><input type="checkbox" id="ac-dir-idle"' + (s.directorIdleOnly ? ' checked' : '') + ' /><span></span></label>' +
