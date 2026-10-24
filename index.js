@@ -1352,25 +1352,28 @@ const xpHtml = (function () {
         return h;
     })();
     const impHtml = (function () {
-        const cards = listCharCards();
-        if (!cards.length) return '';
         const info = state.importInfo;
-        let h = '<div class="ac-card"><div class="h">从别的角色卡导入</div>' +
-            '<div class="hint" style="margin-bottom:10px">把另一张角色卡（她绑定的世界书）里的人物搬到当前世界书。' +
-            '每个人生成一套新条目，原书不动。</div>' +
-            '<div class="ac-f"><label>来源角色卡</label><select id="ac-imp-card">' +
-            cards.map(function (c) {
-                const sel = (info && info.card && String(info.card.i) === String(c.i)) ? ' selected' : '';
-                return '<option value="' + c.i + '"' + sel + '>' + esc(c.name) + '　（' + esc(c.book) + '）</option>';
-            }).join('') + '</select></div>' +
+        const target = effectiveBook();
+        const books = (state.books || []).filter(function (b) { return b && b !== target; });
+        let h = '<div class="ac-card"><div class="h">从别的世界书导入人物</div>' +
+            '<div class="hint" style="margin-bottom:10px">把另一本世界书里的人物搬到当前这本书。' +
+            '每个人生成一套织机格式的新条目，原书不动。</div>' +
+            '<div class="ac-f"><label>来源世界书</label><select id="ac-imp-book">' +
+            '<option value="">（选一本书）</option>' +
+            books.map(function (b) {
+                const sel = (info && info.book === b) ? ' selected' : '';
+                return '<option value="' + esc(b) + '"' + sel + '>' + esc(b) + '</option>';
+            }).join('') +
+            '</select></div>' +
             '<button class="ac-btn" id="ac-imp-scan">读取人物</button>';
         h += '<label class="ac-sw" style="margin-top:10px"><input type="checkbox" id="ac-imp-review"' +
             (settings().importReview ? ' checked' : '') + ' /><span>生成后先放进草稿，让我看过再写</span></label>' +
             '<div class="hint">勾上：每人生成完停在页面顶部的草稿区，逐个确认后再写。' +
-            '不勾：直接写入（写入都记了操作日志，可在「备份」页撤回）。</div>';
+            '不勾：直接写入（都记了操作日志，可在「备份」页撤回）。</div>';
         if (info) {
             const pend = (info.chars || []).filter(function (x2) { return !x2.exists; });
-            h += '<div class="hint" style="margin-top:10px">读到 ' + (info.chars || []).length + ' 个角色，其中 ' + pend.length + ' 个当前书里没有。</div>';
+            h += '<div class="hint" style="margin-top:10px">「' + esc(info.book) + '」里有 ' + (info.chars || []).length + ' 个角色，其中 ' + pend.length + ' 个当前书里没有。</div>';
+            if (!(info.chars || []).length) h += '<div class="ac-warn">这本书里没认出角色。换个命名规范的，或先用「一键修复」统一条目名。</div>';
             h += (info.chars || []).map(function (x2) {
                 const on = (state.importPick || {})[x2.name] !== false && !x2.exists;
                 return '<label class="ac-row" style="gap:8px;cursor:pointer"><input type="checkbox" data-imp="' + esc(x2.name) + '"' + (on ? ' checked' : '') + (x2.exists ? ' disabled' : '') + ' />' +
@@ -1471,7 +1474,7 @@ function wireAdd() {
         persist();
     });
     $('ac-imp-scan')?.addEventListener('click', async function () {
-        const sel = $('ac-imp-card');
+        const sel = $('ac-imp-book');
         const idx = sel ? sel.value : '';
         const prog = toastProgress('正在读取来源世界书…');
         try {
@@ -2772,22 +2775,19 @@ function listCharCards() {
 }
 
 // 读某张角色卡绑定的世界书里有哪些人物
-async function scanImportBook(cardIndex) {
-    const cards = listCharCards();
-    const card = cards.find(function (x) { return String(x.i) === String(cardIndex); });
-    if (!card) throw new Error('这张角色卡没有绑定世界书');
-
-    const chars = await listCharacters(card.book);
+async function scanImportBook(srcBook) {
+    const book = String(srcBook || '').trim();
+    if (!book) throw new Error('先选一本来源世界书');
     const target = effectiveBook();
+    if (target && target === book) throw new Error('目标和来源是同一本书，换一本');
+
+    const chars = await listCharacters(book);
     let have = [];
-    if (target && target !== card.book) {
-        try {
-            const t = await listCharacters(target);
-            have = t.map(function (x) { return x.name; });
-        } catch (e) { /* 目标书读不到就算了 */ }
+    if (target) {
+        try { have = (await listCharacters(target)).map(function (x) { return x.name; }); } catch (e2) {}
     }
     return {
-        card: card,
+        book: book,
         chars: chars.map(function (x) {
             return {
                 name: x.name,
@@ -2806,7 +2806,7 @@ async function runImport(names) {
     if (!info) throw new Error('先读取人物');
     const target = effectiveBook();
     if (!target) throw new Error('先选目标世界书');
-    if (target === info.card.book) throw new Error('目标和来源是同一本世界书');
+    if (target === info.book) throw new Error('目标和来源是同一本世界书');
 
     const picked = (info.chars || []).filter(function (x) { return names.indexOf(x.name) >= 0; });
     if (!picked.length) throw new Error('没有选中任何人');
