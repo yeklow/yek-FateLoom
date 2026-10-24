@@ -610,6 +610,7 @@ const DEFAULTS = {
     entryHash: {},         // 条目内容指纹（检测手改）
     timelineEntry: '行动路线', // 出场时机写进哪条常驻条目
     director: false,          // 出场导演开关
+    directorEvery: 3,          // 全局节奏：至少隔多少楼才安排一次（不管是谁）
     directorGap: 8,           // 至少多少楼没出场才推荐
     directorChance: 0,        // 场景不匹配时强插的概率 %
     directorAllowRandom: false, // 允许随机偶遇（默认关，关着时上面的概率不生效）
@@ -3223,6 +3224,13 @@ async function applyUpdate() {
 const DIR_KEY = 'AC-DIRECTOR';
 
 // 当前聊天的出场记录 { 名字: 最后出现楼层 }
+// 导演自己的运行状态（按聊天分）：上次安排在第几楼
+function dirMeta() {
+    const s = settings();
+    s.dirMeta = s.dirMeta || {};
+    const k = chatKey();
+    return s.dirMeta[k] || (s.dirMeta[k] = {});
+}
 function dirLog() {
     const s = settings();
     s.dirLog = s.dirLog || {};
@@ -3857,6 +3865,15 @@ function runDirector() {
         if (!s.director) { clearDirector(); return; }
         if (!ctx.setExtensionPrompt) return;
 
+        // 全局节奏：不管轮到谁，两次安排之间至少隔 directorEvery 楼
+        // （原来只有「同一个人冷却」，13 个人轮着来等于每轮都有人到期）
+        const every = Math.max(1, Number(s.directorEvery) || 3);
+        const meta = dirMeta();
+        const floorNow = msgTexts().length;
+        if (meta.lastFloor != null && floorNow - meta.lastFloor < every) { clearDirector(); return; }
+        meta.lastFloor = floorNow;
+        persist();
+
         // 注入的这个词必须真的在某个条目的 keys 里，否则扫不到
         const triggerOf = function (nm5) {
             const c5 = ((state.dirCache && state.dirCache.chars) || []).find(function (x) { return x.name === nm5; });
@@ -3946,7 +3963,15 @@ function viewDirector() {
 
     h += '<div class="ac-card"><div class="h">参数</div>';
     h += '<div class="ac-grid2">';
-    h += '<div class="ac-f"><label>建议间隔（楼）</label><input type="number" id="ac-dir-gap" value="' + (s.directorGap || 8) + '" min="1" max="200" />' +
+    h += '<div class="ac-f"><label>出场频率</label>' +
+        '<select id="ac-dir-every">' +
+        [[1,'每轮都安排'],[2,'每 2 楼一次'],[3,'每 3 楼一次'],[5,'每 5 楼一次'],[8,'每 8 楼一次'],[15,'每 15 楼一次']].map(function (o) {
+            return '<option value="' + o[0] + '"' + (Number(s.directorEvery || 3) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('') +
+        '</select>' +
+        '<div class="hint">不管轮到谁，两次安排之间至少隔这么多楼。' +
+        '觉得人来得太勤就调大这个，和下面「同一个人间隔」是两回事。</div></div>';
+    h += '<div class="ac-f"><label>同一个人间隔（楼）</label><input type="number" id="ac-dir-gap" value="' + (s.directorGap || 8) + '" min="1" max="200" />' +
         '<div class="hint">一个人至少这么多楼没出现，才会被推荐。</div></div>';
     h += '<div class="ac-f"><label>允许随机偶遇</label>' +
         '<label class="ac-sw"><input type="checkbox" id="ac-dir-rand"' + (s.directorAllowRandom ? ' checked' : '') + ' /><span></span></label>' +
@@ -4105,6 +4130,7 @@ function wireDirector() {
         persist();
         refreshDirCache().then(function () { render(); }).catch(function () {});
     });
+    bind('ac-dir-every', 'directorEvery', true);
     bind('ac-dir-gap', 'directorGap', true);
     const rnd = $('ac-dir-rand');
     if (rnd) rnd.addEventListener('change', function () { settings().directorAllowRandom = rnd.checked; persist(); render(); });
