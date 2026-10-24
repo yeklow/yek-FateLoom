@@ -6,7 +6,7 @@
   "js": "index.js",
   "css": "style.css",
   "author": "yek",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "auto_update": true,
   "minimum_client_version": "1.12.0"
 }

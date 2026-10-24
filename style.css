@@ -244,3 +244,61 @@
 @keyframes ac-pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
 .ac-toast.done { background: #eaf7f0; border-left: 3px solid #7bd88f; }
 .ac-toast.done .ico { background: #7bd88f; }
+/* ── 表单修正 ─────────────────────────────────── */
+/* 数字输入框：之前完全没样式，退化成浏览器默认小方块 */
+#ac-panel input[type=number] {
+  width: 120px; box-sizing: border-box;
+  background: #14181a; border: 1px solid #2f3739; border-radius: 6px;
+  padding: 9px 11px; color: #dfe6e6; font-size: 13px; font-family: inherit;
+}
+#ac-panel input[type=number]:focus { outline: none; border-color: #8fd9b6; }
+
+/* 表单项限宽，避免在宽面板里被拉成一条 */
+.ac-f { max-width: 660px; }
+.ac-f > input[type=text], .ac-f > textarea, .ac-f > select { max-width: 660px; }
+
+/* 两列布局，参数不至于一列堆到底 */
+.ac-grid2 {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 4px 28px; max-width: 660px; margin-bottom: 4px;
+}
+.ac-grid2 .ac-f { margin-bottom: 10px; }
+
+/* 真正的开关 */
+.ac-sw { display: inline-flex; align-items: center; cursor: pointer; padding: 2px 0; }
+.ac-sw input { position: absolute; opacity: 0; width: 0; height: 0; }
+.ac-sw span:empty {
+  position: relative; display: block; width: 44px; height: 24px;
+  border-radius: 12px; background: #2a3133; border: 1px solid #39423f;
+  transition: background .18s, border-color .18s;
+}
+.ac-sw span:empty::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #8b9a99; transition: left .18s, background .18s;
+}
+.ac-sw input:checked + span:empty { background: #8fd9b6; border-color: #8fd9b6; }
+.ac-sw input:checked + span:empty::after { left: 23px; background: #10201c; }
+
+/* 分段开关也限一下宽 */
+.ac-f > .ac-seg { max-width: 320px; }
+/* 内容列居中限宽：全屏面板太宽，卡片拉满会显得空 */
+#ac-main > * { max-width: 1120px; margin-left: auto; margin-right: auto; }
+#ac-panel h2 { max-width: 1120px; }
+/* 导演提示：和普通提示区分开 */
+.ac-toast.dir { border-left: 3px solid #a78bfa; }
+.ac-toast.dir .ico { background: #a78bfa; color: #1a1024; }
+.ac-toast.dir .t { color: #c4b5fd; }
+.ac-toast.dir.mild { border-left-color: #7dd3fc; }
+.ac-toast.dir.mild .ico { background: #7dd3fc; color: #0c1a20; }
+.ac-toast.dir.mild .t { color: #bae6fd; }
+/* 带文字的开关标签：正常排版，不当作圆钮 */
+.ac-sw span:not(:empty) { display: inline; width: auto; height: auto; background: none; border: none; }
+.ac-sw span:not(:empty)::after { content: none; }
+.ac-sw { gap: 8px; flex-wrap: wrap; }
+/* 带文字的老式开关：把复选框显示出来，不要藏 */
+.ac-sw:has(> span:not(:empty)) input[type=checkbox] {
+  position: static; opacity: 1; width: 16px; height: 16px; margin: 0 2px 0 0;
+  accent-color: #8fd9b6; cursor: pointer;
+}
+.ac-sw:has(> span:not(:empty)) { align-items: center; }
