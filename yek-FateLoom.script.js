@@ -968,7 +968,7 @@ function gatherFromChar() {
 }
 
 // ── 状态 ─────────────────────────────────────────
-const state = { autoScanBusy: false, bookFix: null, bookFixUndo: null, tab: 'add', plan: null, books: [], candidates: [], detecting: false, detectedFor: '', detectError: '', drafts: [], genBusy: false, curAlias: [], existingNames: new Set(), updateChars: [], updateChar: null, updatePlan: null, updateDiff: null };
+const state = { rewrite: null, autoScanBusy: false, bookFix: null, bookFixUndo: null, tab: 'add', plan: null, books: [], candidates: [], detecting: false, detectedFor: '', detectError: '', drafts: [], genBusy: false, curAlias: [], existingNames: new Set(), updateChars: [], updateChar: null, updatePlan: null, updateDiff: null };
 
 // ── 手动检测（只找人不生成） ─────────────────────
 async function detectCandidates(force) {
@@ -1118,7 +1118,7 @@ async function listCharacters(book) {
             name: n,
             count: mine.length,
             chars: mine.reduce(function (a, e) { return a + String(e.content || "").length; }, 0),
-            entries: mine.map(function (e) { return { comment: String(e.comment), content: String(e.content || ""), keys: e.key || [] }; }),
+            entries: mine.map(function (e) { return { __uid: e.uid, comment: String(e.comment), content: String(e.content || ""), keys: e.key || [] }; }),
         });
     }
     return out.sort(function (a, b) { return a.name.localeCompare(b.name, "zh"); });
@@ -2685,8 +2685,29 @@ async function viewUpdate() {
             '<button class="ac-btn pri" id="ac-upd-run">重新分析</button>' +
             '<button class="ac-btn" id="ac-upd-upgrade" style="margin-left:8px">升级成织机格式</button>' +
             '<div class="ac-msg" id="ac-upd-msg"></div></div>';
+    // 就地更新：直接改她原本那一条，不改格式
+    const curC = chars.find(function (x) { return x.name === picked; });
+    if (curC && (curC.entries || []).length) {
+        h += '<div class="ac-card"><div class="h">就地更新（推荐，快）</div>' +
+            '<div class="hint" style="margin-bottom:10px">挑一条，让模型按<b>原文的写法</b>更新它 —— 不改成织机格式，长度也和原文相当，所以很快。</div>';
+        for (const en of curC.entries) {
+            h += '<div class="ac-row"><span class="c">' + esc(en.comment) + '</span>' +
+                '<span class="n">' + String(en.content || "").length + ' 字</span>' +
+                '<button class="ac-btn" data-rewrite="' + esc(String(en.__uid)) + '" style="padding:4px 10px;font-size:12px">更新这条</button></div>';
+        }
+        h += '</div>';
+    }
     }
 
+    if (state.rewrite) {
+        const r = state.rewrite;
+        h += '<div class="ac-card"><div class="h">更新预览：' + esc(r.comment) + '</div>' +
+            '<div class="hint">旧 ' + r.old.length + ' 字 → 新 ' + r.neu.length + ' 字</div>' +
+            '<textarea id="ac-rw-text" style="width:100%;height:240px;margin-top:10px">' + esc(r.neu) + '</textarea>' +
+            '<div style="display:flex;gap:8px;margin-top:10px">' +
+            '<button class="ac-btn pri" id="ac-rw-apply">写入这条</button>' +
+            '<button class="ac-btn" id="ac-rw-cancel">取消</button></div></div>';
+    }
     if (state.updateDiff && state.updateDiff.length) h += renderUpdateDiff();
 
     return h;
@@ -2737,8 +2758,80 @@ function wireUpdate() {
     });
     $('ac-upd-apply')?.addEventListener('click', applyUpdate);
     $('ac-upd-upgrade')?.addEventListener('click', function () { runUpgrade(); });
+    document.querySelectorAll('[data-rewrite]').forEach(function (btn) {
+        btn.addEventListener('click', function () { runRewrite(btn.dataset.rewrite); });
+    });
+    $('ac-rw-apply')?.addEventListener('click', applyRewrite);
+    $('ac-rw-cancel')?.addEventListener('click', function () { state.rewrite = null; render(); });
 }
 
+// ═══════════════════════════════════════════════════════════
+// 就地更新：保持原条目格式，只更新内容（快）
+// ═══════════════════════════════════════════════════════════
+const REWRITE_SYSTEM = [
+  '你在帮人更新一条已经写好的世界书条目。',
+  '',
+  '【铁律】',
+  '1. 保持原文的写法、结构、字段名、分段方式、人称、语气。这是别人写的，不要改成别的格式。',
+  '2. 只更新和新增素材有关的细节，原文里仍然成立的部分原样保留。',
+  '3. 长度和原文相当（上下浮动不超过 30%）。不要扩写成大段新设定。',
+  '4. 不要加标题、不要加说明、不要写「以下是更新后的版本」，直接输出条目正文。',
+  '5. 素材里没提到的，不要编造。',
+].join('\n');
+
+async function runRewrite(uid) {
+    const c = state.updateChar;
+    if (!c) return;
+    const ent = (c.entries || []).find(function (e) { return String(e.__uid) === String(uid) || String(e.comment) === String(uid); });
+    const target = ent || (c.entries || [])[0];
+    if (!target) { toast('找不到这条条目', null, 4000); return; }
+
+    const prog = toastProgress('正在就地更新「' + target.comment + '」…');
+    try {
+        let chatPart = '';
+        try {
+            const hits = gatherFromChat(c.name, []);
+            if (hits.length) chatPart = NL2 + '【新的正文素材】' + NL2 + hits.slice(-20).map(function (h) { return (h.isUser ? '【玩家】' : '【正文】') + h.text; }).join(NL2).slice(0, 6000);
+        } catch (e) { /* 聊天里没有就用空 */ }
+
+        const prompt = REWRITE_SYSTEM + NL2 + NL2 +
+            '【条目名】' + target.comment + NL2 + NL2 +
+            '【条目原文】' + NL2 + String(target.content || '') + chatPart + NL2 + NL2 +
+            '请输出更新后的这一条正文。';
+
+        const raw = await callLLM(prompt);
+        let txt = String(raw || '').trim();
+        // 去掉模型可能加的代码围栏/前言
+        txt = txt.replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/, '').trim();
+
+        state.rewrite = { uid: target.uid, comment: target.comment, old: String(target.content || ''), neu: txt, take: true };
+        prog.acDone('已生成更新版，确认后写入');
+        render();
+    } catch (e) {
+        prog.acDone('更新失败：' + (e.message || e), 8000);
+    }
+}
+
+async function applyRewrite() {
+    const r = state.rewrite;
+    if (!r) return;
+    const book = effectiveBook();
+    const prog = toastProgress('正在写入…');
+    try {
+        const data = await getBook(book);
+        const ent = Object.values(data.entries || {}).find(function (e) { return String(e.uid) === String(r.uid); });
+        if (!ent) throw new Error('这条条目已经不在了');
+        const before = String(ent.content || '');
+        ent.content = r.neu;
+        await putBook(book, data);
+        state.rewrite = null;
+        await refreshDirCache();
+        prog.acDone('已更新「' + r.comment + '」');
+        render();
+    } catch (e) {
+        prog.acDone('写入失败：' + (e.message || e), 8000);
+    }
+}
 // 把现有条目当素材，升级成织机格式（不依赖聊天里出现过她）
 async function runUpgrade() {
     const c = state.updateChar;
