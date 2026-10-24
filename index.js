@@ -2840,7 +2840,7 @@ async function llmScanCharacters(force) {
 }
 // 从世界书里抽出每个角色的场景词和出现方式（缓存用，异步）
 async function refreshDirCache(forBook) {
-    const book = forBook || settings().targetBook;
+    const book = forBook || effectiveBook();
     if (!book) { state.dirCache = null; return null; }
     const data = await getBook(book);
     const vals = Object.values(data.entries || {});
@@ -3400,7 +3400,8 @@ function viewDirector() {
     h += '<div class="hint" style="margin-top:4px">右上角会弹一条「导演 · 出场 / 轻提」，告诉你这一轮它做了什么。</div>';
     h += '</div>';
     h += '<div class="ac-card"><div class="h">素材 <span class="i">' + rows.length + ' 个角色</span></div>' +
-        '<div class="ac-f"><label>从哪本书读</label><select id="ac-dir-book">' +
+        '<div class="ac-f"><label>从哪本书读' + (s.followCharBook !== false ? '（跟随角色卡）' : '（手动指定）') + '</label><select id="ac-dir-book">' +
+        (function () { const cur = effectiveBook(); if (cur && state.books.indexOf(cur) < 0) state.books.unshift(cur); return ''; })() +
         state.books.map(function (b) { return '<option value="' + esc(b) + '"' + (b === s.targetBook ? ' selected' : '') + '>' + esc(b) + '</option>'; }).join('') +
         '</select><div class="hint">会从这里解析「行动路线」的角色和场景词。</div></div>' +
         (function () {
@@ -3794,6 +3795,68 @@ async function undoBookFix() {
     return u.items.length;
 }
 // ═══════════════════════════════════════════════════════════
+// 换角色卡时同步切换世界书
+// ═══════════════════════════════════════════════════════════
+let lastCharKey = null;
+
+function currentCharKey() {
+    try {
+        const id = ctx.characterId == null ? "" : String(ctx.characterId);
+        const ch = ctx.characters && ctx.characters[ctx.characterId];
+        return id + "|" + String((ch && ch.name) || "") + "|" + boundBook();
+    } catch (e) { return ""; }
+}
+
+async function onCharacterSwitched() {
+    const s = settings();
+    const book = boundBook();
+    const ch = ctx.characters && ctx.characters[ctx.characterId];
+    const cname = (ch && ch.name) || "";
+
+    // 跟随角色卡：把它绑定的世界书设为当前目标
+    if (s.followCharBook !== false && book && book !== s.targetBook) {
+        s.targetBook = book;
+        persist();
+    }
+    // 换人了，导演的缓存必须作废，否则还在用上一个人的人设
+    state.dirCache = null;
+    state.bookFix = null;
+    state.dirLast = null;
+
+    if (s.director && s.targetBook) {
+        try { await refreshDirCache(); } catch (e) { console.warn("[命运织机] 切书后读素材失败", e); }
+    }
+    try { renderMini(false); } catch (e) {}
+    try { if ($("ac-overlay") && $("ac-overlay").style.display !== "none") render(); } catch (e) {}
+
+    if (s.directorNotify) {
+        if (book) toast("已切到「" + book + "」" + (cname ? "（" + cname + "）" : ""), null, 4000);
+        else toast("「" + (cname || "当前角色") + "」没有绑定世界书，仍用「" + (s.targetBook || "未选") + "」", null, 5000);
+    }
+}
+
+function watchCharacter() {
+    const tick = function () {
+        const k = currentCharKey();
+        if (k === lastCharKey) return;
+        const first = (lastCharKey === null);
+        lastCharKey = k;
+        if (first) return;            // 首次加载不算切换
+        onCharacterSwitched();
+    };
+    tick();
+    setInterval(tick, 1500);
+    try {
+        const evs = ctx.eventSource, evt = ctx.event_types;
+        if (evs && evt) {
+            if (evt.CHAT_CHANGED) evs.on(evt.CHAT_CHANGED, function () { setTimeout(tick, 400); });
+            if (evt.CHARACTER_PAGE_LOADED) evs.on(evt.CHARACTER_PAGE_LOADED, function () { setTimeout(tick, 400); });
+            if (evt.CHARACTER_EDITED) evs.on(evt.CHARACTER_EDITED, function () { setTimeout(tick, 400); });
+        }
+    } catch (e) { console.warn("[命运织机] 切换监听挂载失败", e); }
+    console.log("[命运织机] 已监听角色卡切换");
+}
+// ═══════════════════════════════════════════════════════════
 // 主页面浮动小面板：不用每次去开魔杖菜单
 // ═══════════════════════════════════════════════════════════
 function ensureMini() {
@@ -3801,7 +3864,7 @@ function ensureMini() {
     const d = document.createElement("div");
     d.id = "ac-mini";
     d.innerHTML = '<div id="ac-mini-body" style="display:none">' +
-        '<div class="mini-h"><span>角色清单</span><b id="ac-mini-n">0/0</b>' +
+        '<div class="mini-h"><span>角色清单</span><b id="ac-mini-book" style="color:#8fa0a0;font-weight:400;font-size:11px;margin-right:6px"></b><b id="ac-mini-n">0/0</b>' +
         '<button id="ac-mini-x" title="收起">×</button></div>' +
         '<div class="mini-l" id="ac-mini-list"></div>' +
         '<div class="mini-f"><button class="ac-btn" id="ac-mini-open">打开完整面板</button>' +
@@ -3843,6 +3906,8 @@ async function renderMini(needCache) {
     const chars = (state.dirCache && state.dirCache.chars) || [];
     const on = chars.filter(function (c) { return c.enabled !== false; }).length;
     if (cnt) cnt.textContent = String(on);
+    const bk = document.getElementById("ac-mini-book");
+    if (bk) bk.textContent = effectiveBook() || '(未选书)';
     if (num) num.textContent = on + "/" + chars.length;
     if (!chars.length) {
         list.innerHTML = '<div class="mini-e">还没有素材。先选目标世界书，或点下面的「重新读取」。</div>';
@@ -3922,5 +3987,6 @@ jQuery(async () => {
 
     ensurePanel();
     try { ensureMini(); } catch (e) { console.warn('[命运织机] 浮动小面板创建失败', e); }
+    try { watchCharacter(); } catch (e) { console.warn('[命运织机] 切换监听启动失败', e); }
     console.log('[命运织机] v0.6.0 已加载 · 世界书 ' + state.books.length + ' 本');
 });
