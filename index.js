@@ -1106,7 +1106,7 @@ async function autoRun() {
 
     autoBusy = true;
     try {
-        const book = effectiveBook() || state.books[0];
+        const book = effectiveBook() || (state.books || [])[0];
         if (!book) return;
 
         // 1) 找候选人
@@ -1479,7 +1479,7 @@ function wireAdd() {
             prog.acDone('读到 ' + info.chars.length + ' 个角色');
             render();
         } catch (e) {
-            prog.acDone('读取失败：' + (e.message || e), 8000);
+            prog.acDone('读取失败：' + errBrief(e), 8000);
         }
     });
     document.querySelectorAll('[data-imp]').forEach(function (box) {
@@ -1506,7 +1506,7 @@ function wireAdd() {
             await refreshDirCache();
             render();
         } catch (e) {
-            prog.acDone('导入失败：' + (e.message || e), 8000);
+            prog.acDone('导入失败：' + errBrief(e), 8000);
         } finally { progNote = function () {}; }
     });
 
@@ -1646,6 +1646,18 @@ function toastDirector(kind, name, gap, text) {
 }
 // 进行中提示：不自动消失，由调用方结束
 const TOAST_RECENT = new Map();
+// 出错时把「哪一行」一起报出来，不然只有一句 message 根本没法定位
+function errBrief(e) {
+    const msg = (e && (e.message || e)) + '';
+    let loc = '';
+    try {
+        const st = String((e && e.stack) || '');
+        const m = st.match(/index\.js\?(\d+):(\d+)/) || st.match(/index\.js:(\d+):(\d+)/);
+        if (m) loc = ' @第' + m[1] + '行';
+    } catch (e2) {}
+    try { console.error('[命运织机]', e); } catch (e2) {}
+    return msg + loc;
+}
 function toastDeduped(text) {
     const now = Date.now();
     const at = TOAST_RECENT.get(text) || 0;
@@ -2138,7 +2150,7 @@ async function doAnalyze() {
         renderResult();
         setMsg('分析完成，检查后点下面的「写入世界书」', 'ok');
     } catch (e) {
-        setMsg('失败：' + (e.message || e), 'err');
+        setMsg('失败：' + errBrief(e), 'err');
     } finally {
         if ($('ac-analyze')) $('ac-analyze').disabled = false;
     }
@@ -2459,8 +2471,8 @@ async function doWrite() {
         state.drafts = (state.drafts || []).filter(d => d.name !== r.name);
         render();
     } catch (e) {
-        prog.acDone('写入失败：' + (e.message || e), 8000);
-        setMsg('写入失败：' + (e.message || e), 'err', 'ac-msg2');
+        prog.acDone('写入失败：' + errBrief(e), 8000);
+        setMsg('写入失败：' + errBrief(e), 'err', 'ac-msg2');
     }
 }
 // ── 提示词编辑（高级） ───────────────────────────
@@ -2829,7 +2841,7 @@ async function runImport(names) {
 }
 // ── 更新已有角色 ─────────────────────────────────
 async function viewUpdate() {
-    const book = effectiveBook() || state.books[0];
+    const book = effectiveBook() || (state.books || [])[0];
     const box = 'ac-upd';
     if (!book) return '<h2>更新角色</h2><div class="ac-card"><div class="ac-empty">先选一本世界书</div></div>';
 
@@ -2950,7 +2962,7 @@ function wireUpdate() {
     $('ac-rw-undo')?.addEventListener('click', async function () {
         const prog = toastProgress('正在撤销…');
         try { const u = await undoRewrite(); prog.acDone('已恢复「' + u.comment + '」的原文'); render(); }
-        catch (e) { prog.acDone('撤销失败：' + (e.message || e), 8000); }
+        catch (e) { prog.acDone('撤销失败：' + errBrief(e), 8000); }
     });
 }
 
@@ -3015,7 +3027,7 @@ async function runAppend(uid) {
         prog.acDone("已生成增补片段：" + txt.length + " 字，原文不动");
         render();
     } catch (e) {
-        prog.acDone("生成失败：" + (e.message || e), 8000);
+        prog.acDone("生成失败：" + errBrief(e), 8000);
     }
 }
 async function undoRewrite() {
@@ -3091,8 +3103,8 @@ async function runUpgrade() {
         prog.acDone("升级方案已生成：" + diff.length + " 条待确认");
         render();
     } catch (e) {
-        prog.acDone("升级失败：" + (e.message || e), 8000);
-        msg("失败：" + (e.message || e), "err");
+        prog.acDone("升级失败：" + errBrief(e), 8000);
+        msg('失败：' + errBrief(e), 'err');
     }
     if (btn) btn.disabled = false;
 }
@@ -3136,8 +3148,8 @@ async function runUpdate() {
         prog.acDone('分析完成：' + diff.length + ' 条待确认');
         render();
     } catch (e) {
-        prog.acDone('更新失败：' + (e.message || e), 8000);
-        msg('失败：' + (e.message || e), 'err');
+        prog.acDone('更新失败：' + errBrief(e), 8000);
+        msg('失败：' + errBrief(e), 'err');
         if (btn) btn.disabled = false;
     }
 }
@@ -3165,8 +3177,8 @@ async function applyUpdate() {
         state.updatePlan = null;
         render();
     } catch (e) {
-        prog.acDone('应用失败：' + (e.message || e), 8000);
-        msg('失败：' + (e.message || e), 'err');
+        prog.acDone('应用失败：' + errBrief(e), 8000);
+        msg('失败：' + errBrief(e), 'err');
     }
 }
 // 出场导演：每轮生成前算出该让谁出场，只注入一小段提示
@@ -3600,7 +3612,7 @@ async function refreshDirCache(forBook) {
             state.autoScanBusy = false;
                 state.autoScanFailed = state.autoScanFailed || {};
                 state.autoScanFailed[scanHashNow] = true;   // 这本书别再自动试了
-            if (prog) prog.acDone("自动扫描失败：" + (e.message || e), 8000);
+            if (prog) prog.acDone("自动扫描失败：" + errBrief(e), 8000);
             console.warn("[命运织机] 自动扫描失败", e);
         });
     }
@@ -3835,7 +3847,7 @@ function runDirector() {
             ].filter(Boolean).join(String.fromCharCode(10));
             ctx.setExtensionPrompt(DIR_KEY, text2, pos, depth, true, 0);
             try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
-            try { const nmI = state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
+            try { const nmI = (state.dirInject || [])[0] && state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
             state.dirLast = { at: Date.now(), name: sg.name, text: text2, gap: 0, by: "llm" };
     try { renderDirStatus(); } catch (e) {}
             state.dirSuggestion = null;
@@ -3856,7 +3868,7 @@ function runDirector() {
             const mt = directorMildText(res.pick);
             ctx.setExtensionPrompt(DIR_KEY, mt, pos, depth, true, 0);
             try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
-            try { const nmI = state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
+            try { const nmI = (state.dirInject || [])[0] && state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
             state.dirLast = { at: Date.now(), name: res.pick.name, text: mt, gap: res.pick.gap, by: "mild" };
     try { renderDirStatus(); } catch (e) {}
             console.log("[命运织机] 导演轻提：" + res.pick.name + "（" + res.pick.gap + " 楼未出场，只提及不出场）");
@@ -3872,7 +3884,7 @@ function runDirector() {
         if (!text) { clearDirector(); return; }
         ctx.setExtensionPrompt(DIR_KEY, text, pos, depth, true, 0);
             try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
-            try { const nmI = state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
+            try { const nmI = (state.dirInject || [])[0] && state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
         state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap, by: "script" };
     try { renderDirStatus(); } catch (e) {}
         console.log("[命运织机] 导演：推荐 " + res.pick.name + "（" + res.pick.gap + " 楼未出场，场景词命中）");
@@ -4174,7 +4186,7 @@ function wireDirector() {
             prog.acDone('扫描完成：认出 ' + r.chars.length + ' 个角色');
             await refreshDirCache();
         } catch (e) {
-            prog.acDone('扫描失败：' + (e.message || e), 8000);
+            prog.acDone('扫描失败：' + errBrief(e), 8000);
         }
         btnScan.disabled = false;
         render();
@@ -4187,7 +4199,7 @@ function wireDirector() {
         try {
             await refreshDirCache();
             prog.acDone('读取完成：' + ((state.dirCache && state.dirCache.chars.length) || 0) + ' 个角色');
-        } catch (e) { prog.acDone('读取失败：' + (e.message || e), 8000); }
+        } catch (e) { prog.acDone('读取失败：' + errBrief(e), 8000); }
         rf.disabled = false;
         render();
     });
@@ -4235,7 +4247,7 @@ function wireBackups() {
                 prog.acDone('已撤销：删掉 ' + r.removed + ' 条，还原 ' + r.restored + ' 条');
                 render();
             } catch (e) {
-                prog.acDone('撤销失败：' + (e.message || e), 8000);
+                prog.acDone('撤销失败：' + errBrief(e), 8000);
                 btn.disabled = false;
             }
         });
