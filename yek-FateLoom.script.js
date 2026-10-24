@@ -3791,19 +3791,20 @@ function directorText(res) {
     if (!res || !res.pick) return '';
     const p = res.pick;
     const L = [];
-    const gapTxt = (p.never || p.gap >= 9000) ? '还从没出场过' : (p.gap + ' 楼未出场');
-    L.push((p.strength === 'strong' ? '[出场提示 · 请安排] ' : '[出场提示] ') + p.name + '（' + gapTxt + '）' + (p.trig && p.trig !== p.name ? '　关键词：' + p.trig : ''));
+    const gapTxt = (p.never || p.gap >= 9000) ? '还从没出场过' : (p.gap + ' 楼没出场了');
+    L.push((p.strength === 'strong' ? '[出场提示 · 请安排]' : '[出场提示]') + ' ' + p.name);
+    L.push((p.never || p.gap >= 9000) ? '她还从没在这个聊天里出现过。' : ('她已经 ' + p.gap + ' 楼没出现了。'));
     if (p.hit && p.hit.length) {
-        if (p.strength === 'strong') L.push('当前就在：' + p.hit.join('、') + '（和她的位置对得上）。');
-        else L.push('当前场景提到了：' + p.hit.join('、') + '　—— 只有她此刻真的就在那个位置附近，才用这条。');
+        if (p.strength === 'strong') L.push('眼下这个场景和她对得上：' + p.hit.join('、') + '。');
+        else L.push('眼下提到了：' + p.hit.join('、') + '—— 只有她确实可能在这个位置附近，才用这条。');
     }
-    else if ((p.scenes || []).length) L.push('她通常在：' + p.scenes.slice(0, 4).join('、') + '（场景对得上才用）。');
-    if (p.hint) L.push('她的出场方式：' + p.hint.slice(0, 90) + '（按你这一段的行文写，不必逐字照搬）');
+    // 不规定她怎么进场 —— 她的人设会随关键词一起被带进来，由模型自己写
     if (p.strength === 'strong') {
-        L.push('这一轮请让她出现在场景里。她已经很久没露面，这次登场合情合理。');
-        L.push('除非和当前正在发生的事直接矛盾（比如人都已经离开了这个地点），否则不要跳过这条。');
+        L.push('这一轮请让她出现在这一段里。她怎么出场、先做了什么、说了什么，按她的人设和你这一段的行文自然写，不要照搬任何固定句式。');
+        L.push('除非和正在发生的事直接矛盾（比如人已经离开这个地点），否则不要跳过。');
     } else {
-        L.push('如果她此刻出现会显得突兀，就忽略本提示，让这一轮没人出场。');
+        L.push('她可以出现在这一段，也可以不出现 —— 你觉得自然就让她进，觉得突兀就忽略本提示。');
+        L.push('如果让她出现，怎么进场由你决定。');
     }
     return L.join(String.fromCharCode(10));
 }
@@ -3874,8 +3875,8 @@ function runDirector() {
                 "[出场提示] " + sg.name + "（这一场适合出现）" + (sg.trig && sg.trig !== sg.name ? "　关键词：" + sg.trig : ""),
                 sg.why ? ("理由：" + sg.why) : "",
                 (c && (c.scenes || []).length) ? ("她通常在：" + c.scenes.slice(0, 4).join("、")) : "",
-                (c && c.hint) ? ("她的出场方式：" + String(c.hint).slice(0, 90)) : "",
-                "如果她此刻出现会显得突兀，就完全忽略本提示 —— 宁可这一轮没人出场。",
+                "这一轮请让她出现在这一段里。怎么出场、做什么、说什么，按她的人设和你这一段的行文自然写。",
+                "除非和正在发生的事直接矛盾，否则不要跳过。",
             ].filter(Boolean).join(String.fromCharCode(10));
             ctx.setExtensionPrompt(DIR_KEY, text2, pos, depth, true, 0);
             state.dirLast = { at: Date.now(), name: sg.name, text: text2, gap: 0, by: "llm" };
