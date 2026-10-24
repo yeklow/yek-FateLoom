@@ -1,8 +1,11 @@
 /* ═══════════════════════════════════════════════════════════
- * yek命运织机 v0.5.0 —— 酒馆助手（Tavern Helper）单文件版
+ * yek命运织机 v0.6.0 —— 酒馆助手（Tavern Helper）单文件版
  *
  * 用法：酒馆助手 → 脚本库 → 新建脚本 → 粘贴本文件全部内容 → 保存
  * 依赖：JS-Slash-Runner（酒馆助手）4.x
+ *
+ * 本文件由 build-script.mjs 自动生成，不要手改。
+ * 改完 index.js / style.css 后跑一次：node build-script.mjs
  * ═══════════════════════════════════════════════════════════ */
 (function () {
     "use strict";
@@ -21,7 +24,7 @@
     };
 
     // ── 注入样式 ──
-    const CSS = "/* AUTO 角色制作 —— 全屏面板样式 */\n#ac-overlay {\n  position: fixed; inset: 0; z-index: 9999;\n  background: rgba(0,0,0,0.55);\n  display: flex; align-items: center; justify-content: center;\n  backdrop-filter: blur(2px);\n}\n#ac-panel {\n  width: min(1440px, 94vw); height: min(900px, 92vh);\n  background: #1e2426; color: #dfe6e6;\n  border: 1px solid #2f3739; border-radius: 12px;\n  display: flex; flex-direction: column; overflow: hidden;\n  box-shadow: 0 24px 80px rgba(0,0,0,0.6);\n  font-size: 14px;\n}\n#ac-head {\n  display: flex; align-items: center; gap: 12px;\n  padding: 0 18px; height: 56px; flex: 0 0 56px;\n  border-bottom: 1px solid #2f3739; background: #1a2022;\n}\n#ac-head .logo {\n  width: 30px; height: 30px; border-radius: 8px;\n  background: #a9e5d0; color: #10201c;\n  display: flex; align-items: center; justify-content: center;\n  font-weight: 700; font-size: 13px;\n}\n#ac-head .title { font-size: 17px; font-weight: 600; flex: 1 1 auto; }\n#ac-head .hbtn {\n  width: 32px; height: 32px; border-radius: 8px; cursor: pointer;\n  display: flex; align-items: center; justify-content: center;\n  color: #9fb0b0; background: transparent; border: 0;\n}\n#ac-head .hbtn:hover { background: #2a3234; color: #dfe6e6; }\n#ac-body { display: flex; flex: 1 1 auto; min-height: 0; }\n#ac-side {\n  width: 240px; flex: 0 0 240px; background: #191e20;\n  border-right: 1px solid #2f3739; padding: 14px 12px; overflow: auto;\n}\n#ac-side .g { font-size: 11px; color: #6f8080; padding: 10px 12px 6px; letter-spacing: .5px; }\n#ac-side .it {\n  padding: 10px 14px; border-radius: 8px; cursor: pointer;\n  color: #c2d0d0; margin-bottom: 2px; user-select: none;\n}\n#ac-side .it:hover { background: #232a2c; }\n#ac-side .it.on { background: #a9e5d0; color: #10201c; font-weight: 600; }\n#ac-main { flex: 1 1 auto; overflow: auto; padding: 22px 26px 40px; }\n#ac-main h2 { font-size: 22px; margin: 0 0 18px; font-weight: 600; }\n.ac-card {\n  background: #232a2c; border: 1px solid #2f3739; border-radius: 10px;\n  padding: 18px 20px; margin-bottom: 16px;\n}\n.ac-card > .h {\n  display: flex; align-items: center; gap: 8px;\n  font-size: 15px; font-weight: 600; margin-bottom: 14px;\n}\n.ac-card > .h .i { margin-left: auto; color: #6f8080; font-size: 13px; }\n.ac-f { margin-bottom: 14px; }\n.ac-f:last-child { margin-bottom: 0; }\n.ac-f > label { display: block; font-size: 12px; color: #8fa0a0; margin-bottom: 6px; }\n.ac-f .hint { font-size: 12px; color: #6f8080; margin-top: 6px; line-height: 1.5; }\n#ac-panel input[type=text], #ac-panel select, #ac-panel textarea {\n  width: 100%; box-sizing: border-box;\n  background: #14181a; border: 1px solid #2f3739; border-radius: 6px;\n  padding: 9px 11px; color: #dfe6e6; font-size: 13px; font-family: inherit;\n}\n#ac-panel textarea { resize: vertical; min-height: 78px; line-height: 1.55; }\n#ac-panel input:focus, #ac-panel select:focus, #ac-panel textarea:focus {\n  outline: none; border-color: #a9e5d0;\n}\n.ac-seg { display: flex; gap: 4px; background: #14181a; border-radius: 8px; padding: 4px; border: 1px solid #2f3739; }\n.ac-seg > div {\n  flex: 1 1 0; text-align: center; padding: 8px 10px; border-radius: 6px;\n  cursor: pointer; font-size: 13px; color: #9fb0b0;\n}\n.ac-seg > div.on { background: #a9e5d0; color: #10201c; font-weight: 600; }\n.ac-btn {\n  display: inline-flex; align-items: center; gap: 7px;\n  padding: 9px 16px; border-radius: 8px; cursor: pointer;\n  border: 1px solid #2f3739; background: #2a3234; color: #dfe6e6;\n  font-size: 13px; font-family: inherit;\n}\n.ac-btn:hover { background: #333c3f; }\n.ac-btn.pri { background: #a9e5d0; color: #10201c; border-color: #a9e5d0; font-weight: 600; }\n.ac-btn.pri:hover { background: #b8efdd; }\n.ac-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.ac-btn.big { width: 100%; justify-content: center; padding: 12px; font-size: 14px; }\n.ac-msg { min-height: 20px; font-size: 13px; color: #9fb0b0; margin-top: 10px; }\n.ac-msg.err { color: #ff8f8f; }\n.ac-msg.ok { color: #7bd88f; }\n.ac-pos { font-size: 13px; line-height: 1.9; color: #c2d0d0; }\n.ac-pos b { color: #a9e5d0; font-weight: 600; }\n.ac-ec { border: 1px solid #2f3739; border-radius: 8px; padding: 12px 14px; margin-top: 10px; background: #1a2022; }\n.ac-ec .h { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 600; }\n.ac-ec .h .len { margin-left: auto; color: #6f8080; font-size: 12px; font-weight: 400; }\n.ac-ec textarea { margin-top: 10px; min-height: 120px; font-size: 12.5px; }\n.ac-ec .kw { font-size: 12px; color: #6f8080; margin-top: 6px; }\n.ac-warn { font-size: 13px; color: #e8c07b; line-height: 1.6; margin: 4px 0; }\n.ac-list { max-height: 320px; overflow: auto; border: 1px solid #2f3739; border-radius: 8px; }\n.ac-row {\n  display: flex; gap: 10px; align-items: center; padding: 8px 12px;\n  border-bottom: 1px solid #262d2f; cursor: pointer; font-size: 13px;\n}\n.ac-row:last-child { border-bottom: 0; }\n.ac-row:hover { background: #232a2c; }\n.ac-row .c { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.ac-row .dot { color: #a9e5d0; }\n.ac-row .n { color: #6f8080; font-size: 12px; }\n.ac-view {\n  margin-top: 12px; max-height: 300px; overflow: auto;\n  white-space: pre-wrap; font-size: 12.5px; line-height: 1.65;\n  border: 1px solid #2f3739; border-radius: 8px; padding: 12px; background: #14181a;\n}\n.ac-stat { display: flex; gap: 12px; flex-wrap: wrap; }\n.ac-stat > div {\n  flex: 1 1 150px; background: #1a2022; border: 1px solid #2f3739;\n  border-radius: 8px; padding: 14px 16px;\n}\n.ac-stat .k { font-size: 12px; color: #6f8080; margin-bottom: 6px; }\n.ac-stat .v { font-size: 20px; font-weight: 600; color: #a9e5d0; }\n.ac-bk { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid #262d2f; font-size: 13px; }\n.ac-bk .t { flex: 1 1 auto; color: #c2d0d0; }\n.ac-empty { color: #6f8080; font-size: 13px; padding: 10px 0; }\n/* 专门的关闭按钮 */\n#ac-close {\n  border: 1px solid #2f3739;\n  background: #232a2c;\n  width: auto;\n  padding: 0 12px;\n  gap: 6px;\n  font-size: 13px;\n}\n#ac-close span { font-size: 13px; }\n#ac-close:hover {\n  background: #a9e5d0;\n  color: #10201c;\n  border-color: #a9e5d0;\n}\n/* 遮罩不再响应点击关闭 */\n#ac-overlay { cursor: default; }\n/* 结构化编辑器的分组卡片 */\n.ac-sub { border: 1px solid #2f3739; border-radius: 8px; padding: 12px 14px; margin: 10px 0; background: #1a2022; }\n.ac-sub-h { font-size: 13px; font-weight: 600; color: #a9e5d0; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }\n.ac-sub-h .i { margin-left: auto; color: #6f8080; font-size: 12px; font-weight: 400; }\n.ac-row2 { display: flex; gap: 12px; }\n.ac-row2 > .ac-f { flex: 1 1 0; min-width: 0; }\n.ac-draft { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #262d2f; font-size: 13px; }\n.ac-draft .nm { flex: 1 1 auto; }\n.ac-draft .tag { font-size: 11px; color: #10201c; background: #a9e5d0; border-radius: 4px; padding: 1px 6px; }\n/* 右上角浮动提示（对齐数据库的样式） */\n#ac-toasts {\n  position: fixed; top: 64px; right: 16px; z-index: 9998;\n  display: flex; flex-direction: column; gap: 8px;\n  pointer-events: none;\n}\n.ac-toast {\n  pointer-events: auto;\n  display: flex; align-items: center; gap: 10px;\n  background: #f4f6f6; color: #1a2022;\n  border-radius: 10px; padding: 12px 14px;\n  min-width: 300px; max-width: 390px;\n  box-shadow: 0 8px 28px rgba(0,0,0,0.35);\n  animation: ac-toast-in .22s ease-out;\n}\n.ac-toast.out { opacity: 0; transform: translateY(-6px); transition: all .2s; }\n.ac-toast .ico {\n  width: 34px; height: 34px; border-radius: 8px; flex: 0 0 auto;\n  background: #a9e5d0; color: #10201c;\n  display: flex; align-items: center; justify-content: center;\n  font-weight: 700; font-size: 12px;\n}\n.ac-toast .tx { flex: 1 1 auto; min-width: 0; }\n.ac-toast .t { font-size: 13px; font-weight: 600; }\n.ac-toast .d { font-size: 12px; color: #5c6a6a; margin-top: 2px; line-height: 1.45; }\n.ac-toast .go {\n  flex: 0 0 auto; border: 1px solid #cfd8d8; background: #fff; color: #1a2022;\n  border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer;\n}\n.ac-toast .go:hover { background: #a9e5d0; border-color: #a9e5d0; }\n.ac-toast .x {\n  flex: 0 0 auto; border: 0; background: transparent; color: #8a9797;\n  font-size: 17px; line-height: 1; cursor: pointer; padding: 0 2px;\n}\n@keyframes ac-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }\n/* 开关行 */\n.ac-sw {\n  display: flex; align-items: center; gap: 9px;\n  cursor: pointer; font-size: 13.5px; color: #dfe6e6;\n  padding: 4px 0; user-select: none;\n}\n.ac-sw input[type=checkbox] {\n  width: 16px; height: 16px; flex: 0 0 auto;\n  accent-color: #a9e5d0; cursor: pointer;\n}\n/* 字数检查行 */\n.ac-len { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #262d2f; font-size: 13px; }\n.ac-len:last-child { border-bottom: 0; }\n.ac-len .nm { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.ac-len .v { color: #a9e5d0; font-weight: 600; }\n.ac-len .t { color: #6f8080; font-size: 12px; }\n.ac-len .s { min-width: 34px; text-align: right; color: #7bd88f; font-size: 12px; }\n.ac-len.bad .v { color: #e8c07b; }\n.ac-len.bad .s { color: #e8c07b; }\n/* 性癖池 */\n.ac-xp { border: 1px solid #2f3739; border-radius: 8px; background: #1a2022; padding: 10px 12px; margin-top: 12px; }\n.ac-xp > summary {\n  cursor: pointer; font-size: 13px; font-weight: 600; color: #a9e5d0;\n  list-style: none; display: flex; align-items: center; gap: 8px;\n}\n.ac-xp > summary::-webkit-details-marker { display: none; }\n.ac-xp > summary:before { content: '▸'; }\n.ac-xp[open] > summary:before { content: '▾'; }\n.ac-xp .cnt { font-weight: 400; color: #6f8080; font-size: 12px; }\n.ac-xpg { margin-top: 10px; }\n.ac-xpg-h { font-size: 12px; color: #8fa0a0; margin-bottom: 6px; }\n.ac-xpi { display: flex; flex-wrap: wrap; gap: 6px 12px; }\n.ac-xpc {\n  display: flex; align-items: center; gap: 5px;\n  font-size: 12.5px; color: #c2d0d0; cursor: pointer; user-select: none;\n}\n.ac-xpc input { width: 14px; height: 14px; accent-color: #a9e5d0; cursor: pointer; }\n/* 世界书选择行 */\n.ac-bookrow { display: flex; gap: 8px; align-items: center; }\n.ac-bookrow > select { flex: 1 1 auto; min-width: 0; }\n.ac-bookrow > .ac-btn { flex: 0 0 auto; padding: 9px 14px; }\n.ac-f .cnt { font-weight: 400; color: #6f8080; font-size: 12px; }\n#ac-bookstate b { color: #a9e5d0; }\n/* 未命名标签 */\n.ac-row .tag, .ac-draft .tag {\n  font-size: 11px; border-radius: 4px; padding: 1px 6px;\n  background: #ffd479; color: #3a2a00; font-weight: 600;\n}\n.ac-draft .tag { background: #a9e5d0; color: #10201c; }\n/* 蓝色：出场时机 */\n.ac-blue { border-color: #4a90d9; }\n.ac-blue > .h { color: #7fb7ea; }\n.ac-blue .bdot {\n  width: 9px; height: 9px; border-radius: 50%;\n  background: #4a90d9; display: inline-block; margin-right: 8px;\n  box-shadow: 0 0 8px rgba(74,144,217,0.7);\n}\n/* 进行中 / 完成状态 */\n.ac-toast.working { border-left: 3px solid #a9e5d0; }\n.ac-toast .ico.spin { animation: ac-pulse 1.1s ease-in-out infinite; }\n@keyframes ac-pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }\n.ac-toast.done { background: #eaf7f0; border-left: 3px solid #7bd88f; }\n.ac-toast.done .ico { background: #7bd88f; }";
+    const CSS = "/* AUTO 角色制作 —— 全屏面板样式 */\n#ac-overlay {\n  position: fixed; inset: 0; z-index: 9999;\n  background: rgba(0,0,0,0.55);\n  display: flex; align-items: center; justify-content: center;\n  backdrop-filter: blur(2px);\n}\n#ac-panel {\n  width: min(1440px, 94vw); height: min(900px, 92vh);\n  background: #1e2426; color: #dfe6e6;\n  border: 1px solid #2f3739; border-radius: 12px;\n  display: flex; flex-direction: column; overflow: hidden;\n  box-shadow: 0 24px 80px rgba(0,0,0,0.6);\n  font-size: 14px;\n}\n#ac-head {\n  display: flex; align-items: center; gap: 12px;\n  padding: 0 18px; height: 56px; flex: 0 0 56px;\n  border-bottom: 1px solid #2f3739; background: #1a2022;\n}\n#ac-head .logo {\n  width: 30px; height: 30px; border-radius: 8px;\n  background: #a9e5d0; color: #10201c;\n  display: flex; align-items: center; justify-content: center;\n  font-weight: 700; font-size: 13px;\n}\n#ac-head .title { font-size: 17px; font-weight: 600; flex: 1 1 auto; }\n#ac-head .hbtn {\n  width: 32px; height: 32px; border-radius: 8px; cursor: pointer;\n  display: flex; align-items: center; justify-content: center;\n  color: #9fb0b0; background: transparent; border: 0;\n}\n#ac-head .hbtn:hover { background: #2a3234; color: #dfe6e6; }\n#ac-body { display: flex; flex: 1 1 auto; min-height: 0; }\n#ac-side {\n  width: 240px; flex: 0 0 240px; background: #191e20;\n  border-right: 1px solid #2f3739; padding: 14px 12px; overflow: auto;\n}\n#ac-side .g { font-size: 11px; color: #6f8080; padding: 10px 12px 6px; letter-spacing: .5px; }\n#ac-side .it {\n  padding: 10px 14px; border-radius: 8px; cursor: pointer;\n  color: #c2d0d0; margin-bottom: 2px; user-select: none;\n}\n#ac-side .it:hover { background: #232a2c; }\n#ac-side .it.on { background: #a9e5d0; color: #10201c; font-weight: 600; }\n#ac-main { flex: 1 1 auto; overflow: auto; padding: 22px 26px 40px; }\n#ac-main h2 { font-size: 22px; margin: 0 0 18px; font-weight: 600; }\n.ac-card {\n  background: #232a2c; border: 1px solid #2f3739; border-radius: 10px;\n  padding: 18px 20px; margin-bottom: 16px;\n}\n.ac-card > .h {\n  display: flex; align-items: center; gap: 8px;\n  font-size: 15px; font-weight: 600; margin-bottom: 14px;\n}\n.ac-card > .h .i { margin-left: auto; color: #6f8080; font-size: 13px; }\n.ac-f { margin-bottom: 14px; }\n.ac-f:last-child { margin-bottom: 0; }\n.ac-f > label { display: block; font-size: 12px; color: #8fa0a0; margin-bottom: 6px; }\n.ac-f .hint { font-size: 12px; color: #6f8080; margin-top: 6px; line-height: 1.5; }\n#ac-panel input[type=text], #ac-panel select, #ac-panel textarea {\n  width: 100%; box-sizing: border-box;\n  background: #14181a; border: 1px solid #2f3739; border-radius: 6px;\n  padding: 9px 11px; color: #dfe6e6; font-size: 13px; font-family: inherit;\n}\n#ac-panel textarea { resize: vertical; min-height: 78px; line-height: 1.55; }\n#ac-panel input:focus, #ac-panel select:focus, #ac-panel textarea:focus {\n  outline: none; border-color: #a9e5d0;\n}\n.ac-seg { display: flex; gap: 4px; background: #14181a; border-radius: 8px; padding: 4px; border: 1px solid #2f3739; }\n.ac-seg > div {\n  flex: 1 1 0; text-align: center; padding: 8px 10px; border-radius: 6px;\n  cursor: pointer; font-size: 13px; color: #9fb0b0;\n}\n.ac-seg > div.on { background: #a9e5d0; color: #10201c; font-weight: 600; }\n.ac-btn {\n  display: inline-flex; align-items: center; gap: 7px;\n  padding: 9px 16px; border-radius: 8px; cursor: pointer;\n  border: 1px solid #2f3739; background: #2a3234; color: #dfe6e6;\n  font-size: 13px; font-family: inherit;\n}\n.ac-btn:hover { background: #333c3f; }\n.ac-btn.pri { background: #a9e5d0; color: #10201c; border-color: #a9e5d0; font-weight: 600; }\n.ac-btn.pri:hover { background: #b8efdd; }\n.ac-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.ac-btn.big { width: 100%; justify-content: center; padding: 12px; font-size: 14px; }\n.ac-msg { min-height: 20px; font-size: 13px; color: #9fb0b0; margin-top: 10px; }\n.ac-msg.err { color: #ff8f8f; }\n.ac-msg.ok { color: #7bd88f; }\n.ac-pos { font-size: 13px; line-height: 1.9; color: #c2d0d0; }\n.ac-pos b { color: #a9e5d0; font-weight: 600; }\n.ac-ec { border: 1px solid #2f3739; border-radius: 8px; padding: 12px 14px; margin-top: 10px; background: #1a2022; }\n.ac-ec .h { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 600; }\n.ac-ec .h .len { margin-left: auto; color: #6f8080; font-size: 12px; font-weight: 400; }\n.ac-ec textarea { margin-top: 10px; min-height: 120px; font-size: 12.5px; }\n.ac-ec .kw { font-size: 12px; color: #6f8080; margin-top: 6px; }\n.ac-warn { font-size: 13px; color: #e8c07b; line-height: 1.6; margin: 4px 0; }\n.ac-list { max-height: 320px; overflow: auto; border: 1px solid #2f3739; border-radius: 8px; }\n.ac-row {\n  display: flex; gap: 10px; align-items: center; padding: 8px 12px;\n  border-bottom: 1px solid #262d2f; cursor: pointer; font-size: 13px;\n}\n.ac-row:last-child { border-bottom: 0; }\n.ac-row:hover { background: #232a2c; }\n.ac-row .c { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.ac-row .dot { color: #a9e5d0; }\n.ac-row .n { color: #6f8080; font-size: 12px; }\n.ac-view {\n  margin-top: 12px; max-height: 300px; overflow: auto;\n  white-space: pre-wrap; font-size: 12.5px; line-height: 1.65;\n  border: 1px solid #2f3739; border-radius: 8px; padding: 12px; background: #14181a;\n}\n.ac-stat { display: flex; gap: 12px; flex-wrap: wrap; }\n.ac-stat > div {\n  flex: 1 1 150px; background: #1a2022; border: 1px solid #2f3739;\n  border-radius: 8px; padding: 14px 16px;\n}\n.ac-stat .k { font-size: 12px; color: #6f8080; margin-bottom: 6px; }\n.ac-stat .v { font-size: 20px; font-weight: 600; color: #a9e5d0; }\n.ac-bk { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid #262d2f; font-size: 13px; }\n.ac-bk .t { flex: 1 1 auto; color: #c2d0d0; }\n.ac-empty { color: #6f8080; font-size: 13px; padding: 10px 0; }\n/* 专门的关闭按钮 */\n#ac-close {\n  border: 1px solid #2f3739;\n  background: #232a2c;\n  width: auto;\n  padding: 0 12px;\n  gap: 6px;\n  font-size: 13px;\n}\n#ac-close span { font-size: 13px; }\n#ac-close:hover {\n  background: #a9e5d0;\n  color: #10201c;\n  border-color: #a9e5d0;\n}\n/* 遮罩不再响应点击关闭 */\n#ac-overlay { cursor: default; }\n/* 结构化编辑器的分组卡片 */\n.ac-sub { border: 1px solid #2f3739; border-radius: 8px; padding: 12px 14px; margin: 10px 0; background: #1a2022; }\n.ac-sub-h { font-size: 13px; font-weight: 600; color: #a9e5d0; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }\n.ac-sub-h .i { margin-left: auto; color: #6f8080; font-size: 12px; font-weight: 400; }\n.ac-row2 { display: flex; gap: 12px; }\n.ac-row2 > .ac-f { flex: 1 1 0; min-width: 0; }\n.ac-draft { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #262d2f; font-size: 13px; }\n.ac-draft .nm { flex: 1 1 auto; }\n.ac-draft .tag { font-size: 11px; color: #10201c; background: #a9e5d0; border-radius: 4px; padding: 1px 6px; }\n/* 右上角浮动提示（对齐数据库的样式） */\n#ac-toasts {\n  position: fixed; top: 64px; right: 16px; z-index: 9998;\n  display: flex; flex-direction: column; gap: 8px;\n  pointer-events: none;\n}\n.ac-toast {\n  pointer-events: auto;\n  display: flex; align-items: center; gap: 10px;\n  background: #f4f6f6; color: #1a2022;\n  border-radius: 10px; padding: 12px 14px;\n  min-width: 300px; max-width: 390px;\n  box-shadow: 0 8px 28px rgba(0,0,0,0.35);\n  animation: ac-toast-in .22s ease-out;\n}\n.ac-toast.out { opacity: 0; transform: translateY(-6px); transition: all .2s; }\n.ac-toast .ico {\n  width: 34px; height: 34px; border-radius: 8px; flex: 0 0 auto;\n  background: #a9e5d0; color: #10201c;\n  display: flex; align-items: center; justify-content: center;\n  font-weight: 700; font-size: 12px;\n}\n.ac-toast .tx { flex: 1 1 auto; min-width: 0; }\n.ac-toast .t { font-size: 13px; font-weight: 600; }\n.ac-toast .d { font-size: 12px; color: #5c6a6a; margin-top: 2px; line-height: 1.45; }\n.ac-toast .go {\n  flex: 0 0 auto; border: 1px solid #cfd8d8; background: #fff; color: #1a2022;\n  border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer;\n}\n.ac-toast .go:hover { background: #a9e5d0; border-color: #a9e5d0; }\n.ac-toast .x {\n  flex: 0 0 auto; border: 0; background: transparent; color: #8a9797;\n  font-size: 17px; line-height: 1; cursor: pointer; padding: 0 2px;\n}\n@keyframes ac-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }\n/* 开关行 */\n.ac-sw {\n  display: flex; align-items: center; gap: 9px;\n  cursor: pointer; font-size: 13.5px; color: #dfe6e6;\n  padding: 4px 0; user-select: none;\n}\n.ac-sw input[type=checkbox] {\n  width: 16px; height: 16px; flex: 0 0 auto;\n  accent-color: #a9e5d0; cursor: pointer;\n}\n/* 字数检查行 */\n.ac-len { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #262d2f; font-size: 13px; }\n.ac-len:last-child { border-bottom: 0; }\n.ac-len .nm { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.ac-len .v { color: #a9e5d0; font-weight: 600; }\n.ac-len .t { color: #6f8080; font-size: 12px; }\n.ac-len .s { min-width: 34px; text-align: right; color: #7bd88f; font-size: 12px; }\n.ac-len.bad .v { color: #e8c07b; }\n.ac-len.bad .s { color: #e8c07b; }\n/* 性癖池 */\n.ac-xp { border: 1px solid #2f3739; border-radius: 8px; background: #1a2022; padding: 10px 12px; margin-top: 12px; }\n.ac-xp > summary {\n  cursor: pointer; font-size: 13px; font-weight: 600; color: #a9e5d0;\n  list-style: none; display: flex; align-items: center; gap: 8px;\n}\n.ac-xp > summary::-webkit-details-marker { display: none; }\n.ac-xp > summary:before { content: '▸'; }\n.ac-xp[open] > summary:before { content: '▾'; }\n.ac-xp .cnt { font-weight: 400; color: #6f8080; font-size: 12px; }\n.ac-xpg { margin-top: 10px; }\n.ac-xpg-h { font-size: 12px; color: #8fa0a0; margin-bottom: 6px; }\n.ac-xpi { display: flex; flex-wrap: wrap; gap: 6px 12px; }\n.ac-xpc {\n  display: flex; align-items: center; gap: 5px;\n  font-size: 12.5px; color: #c2d0d0; cursor: pointer; user-select: none;\n}\n.ac-xpc input { width: 14px; height: 14px; accent-color: #a9e5d0; cursor: pointer; }\n/* 世界书选择行 */\n.ac-bookrow { display: flex; gap: 8px; align-items: center; }\n.ac-bookrow > select { flex: 1 1 auto; min-width: 0; }\n.ac-bookrow > .ac-btn { flex: 0 0 auto; padding: 9px 14px; }\n.ac-f .cnt { font-weight: 400; color: #6f8080; font-size: 12px; }\n#ac-bookstate b { color: #a9e5d0; }\n/* 未命名标签 */\n.ac-row .tag, .ac-draft .tag {\n  font-size: 11px; border-radius: 4px; padding: 1px 6px;\n  background: #ffd479; color: #3a2a00; font-weight: 600;\n}\n.ac-draft .tag { background: #a9e5d0; color: #10201c; }\n/* 蓝色：出场时机 */\n.ac-blue { border-color: #4a90d9; }\n.ac-blue > .h { color: #7fb7ea; }\n.ac-blue .bdot {\n  width: 9px; height: 9px; border-radius: 50%;\n  background: #4a90d9; display: inline-block; margin-right: 8px;\n  box-shadow: 0 0 8px rgba(74,144,217,0.7);\n}\n/* 进行中 / 完成状态 */\n.ac-toast.working { border-left: 3px solid #a9e5d0; }\n.ac-toast .ico.spin { animation: ac-pulse 1.1s ease-in-out infinite; }\n@keyframes ac-pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }\n.ac-toast.done { background: #eaf7f0; border-left: 3px solid #7bd88f; }\n.ac-toast.done .ico { background: #7bd88f; }\n/* ── 表单修正 ─────────────────────────────────── */\n/* 数字输入框：之前完全没样式，退化成浏览器默认小方块 */\n#ac-panel input[type=number] {\n  width: 120px; box-sizing: border-box;\n  background: #14181a; border: 1px solid #2f3739; border-radius: 6px;\n  padding: 9px 11px; color: #dfe6e6; font-size: 13px; font-family: inherit;\n}\n#ac-panel input[type=number]:focus { outline: none; border-color: #8fd9b6; }\n\n/* 表单项限宽，避免在宽面板里被拉成一条 */\n.ac-f { max-width: 660px; }\n.ac-f > input[type=text], .ac-f > textarea, .ac-f > select { max-width: 660px; }\n\n/* 两列布局，参数不至于一列堆到底 */\n.ac-grid2 {\n  display: grid; grid-template-columns: 1fr 1fr;\n  gap: 4px 28px; max-width: 660px; margin-bottom: 4px;\n}\n.ac-grid2 .ac-f { margin-bottom: 10px; }\n\n/* 真正的开关 */\n.ac-sw { display: inline-flex; align-items: center; cursor: pointer; padding: 2px 0; }\n.ac-sw input { position: absolute; opacity: 0; width: 0; height: 0; }\n.ac-sw span:empty {\n  position: relative; display: block; width: 44px; height: 24px;\n  border-radius: 12px; background: #2a3133; border: 1px solid #39423f;\n  transition: background .18s, border-color .18s;\n}\n.ac-sw span:empty::after {\n  content: ''; position: absolute; top: 3px; left: 3px;\n  width: 16px; height: 16px; border-radius: 50%;\n  background: #8b9a99; transition: left .18s, background .18s;\n}\n.ac-sw input:checked + span:empty { background: #8fd9b6; border-color: #8fd9b6; }\n.ac-sw input:checked + span:empty::after { left: 23px; background: #10201c; }\n\n/* 分段开关也限一下宽 */\n.ac-f > .ac-seg { max-width: 320px; }\n/* 内容列居中限宽：全屏面板太宽，卡片拉满会显得空 */\n#ac-main > * { max-width: 1120px; margin-left: auto; margin-right: auto; }\n#ac-panel h2 { max-width: 1120px; }\n/* 导演提示：和普通提示区分开 */\n.ac-toast.dir { border-left: 3px solid #a78bfa; }\n.ac-toast.dir .ico { background: #a78bfa; color: #1a1024; }\n.ac-toast.dir .t { color: #c4b5fd; }\n.ac-toast.dir.mild { border-left-color: #7dd3fc; }\n.ac-toast.dir.mild .ico { background: #7dd3fc; color: #0c1a20; }\n.ac-toast.dir.mild .t { color: #bae6fd; }\n/* 带文字的开关标签：正常排版，不当作圆钮 */\n.ac-sw span:not(:empty) { display: inline; width: auto; height: auto; background: none; border: none; }\n.ac-sw span:not(:empty)::after { content: none; }\n.ac-sw { gap: 8px; flex-wrap: wrap; }\n/* 带文字的老式开关：把复选框显示出来，不要藏 */\n.ac-sw:has(> span:not(:empty)) input[type=checkbox] {\n  position: static; opacity: 1; width: 16px; height: 16px; margin: 0 2px 0 0;\n  accent-color: #8fd9b6; cursor: pointer;\n}\n.ac-sw:has(> span:not(:empty)) { align-items: center; }";
     (function injectCss() {
         const id = "ac-style-script";
         const old = DOC.getElementById(id);
@@ -32,6 +35,9 @@
         (DOC.head || DOC.documentElement).appendChild(st);
     })();
 
+// ═══════════════════════════════════════════════════════════
+// yek命运织机 v0.6 —— 出场导演 + LLM 扫世界书
+// ═══════════════════════════════════════════════════════════
 
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
@@ -567,9 +573,9 @@ const LEN = {
     guide: [400, 900],
 };
 
-const SYSTEM = "你是角色卡转世界书条目的转换器。把一个人物做成世界书里正式的、能被 AI 认知并主动调用的角色。\n\n【铁律】\n① 种族不改：素材里是什么种族就是什么，人类不改魅魔。\n② 设定照搬：素材写过的外貌、体型、服装、说话方式、口癖、行为习惯，一字不改。\n③ 素材没写的，允许按基调合理补全，但要补得像样、自成一体，不要敷衍留空。\n④ 世界以主卡为准：能和现有世界观融合就融合，实在冲突的丢弃。\n⑤ keys 里任何一项都不能含空格，一项一个词。\n\n【三条的边界，不要写重】\n- 角色卡 = 人设：基调、身份、背景、性格、语言、习惯动作。外貌只写发型面部、日常服饰、标志物，\n  以及一句整体轮廓（如丰腴、纤细），不写尺寸、不写私处。\n- 身体配置 = 身体：尺寸、形状、质感、私处、非人形态。所有身体细节都写在这里。\n- 性癖档案 = 性：敏感带、弱点、偏好、癖好、技巧。不重复身体配置里的数字。\n\n【关于 body（第2条·身体配置）】\n1:1 复刻下面这个格式，字段一个都不能少：\n<body_configuration character=\"名字\">\n整体身材: - 类型: [...]        整体比例: - 比例: [...]\n胸部: - 尺寸 / 形状 / 乳头与乳晕\n腰部: - 特征 / 腰臀比          臀部: - 形状 / 质感\n私处: - 小穴(毛发/形态/颜色/敏感度/名器说法/特征) - 菊穴(形态/颜色/名器说法/特征)\n腿部: - 形态                  肌肉线条: - 清晰度 / 分布\n其他体态特征: - 皮肤颜色 / 皮肤质感 / 皮肤特征 / 体态\n半妖形态: - 姿态名称 / 具体显化 / 整体气场   （纯人类角色写「无」，不要编造非人形态）\n</body_configuration>\n\n【关于 sex（第3条·性癖档案）】\n1:1 复刻下面这个格式：\n<sexual_profile character=\"名字\">\n性标签(总结性): \"[...]\"\nA. 敏感带: 敏感度评级 + 6 个部位（耳垂与颈部/背部与脊柱沟/胸部/腰腹与侧腹/大腿内侧/私密地带），每条写「等级 - 说明」\nB. 性弱点: 主要生理弱点 + 刺激方式 / 次要生理弱点 + 刺激方式 / 精神言语弱点 + 触发词句 + 触发反应\nC. 性格与偏好: NSFW场景表现 + 主动被动倾向 + 表达方式 + 喜好的性风格(节奏/氛围) + 喜好的性姿势(2~3 个)\nD. 特殊癖好: 接受度评级 + 6 项左右（每项标 仅幻想/愿意尝试/喜爱/痴迷）\nE. 特殊性技巧: 1~2 个，每个写 技巧名称 + 技巧效果\n</sexual_profile>\n\n写这两条时要结合本角色的种族、权能、体型来设计，不要写成通用模板。\n【关于 appear（第4条·出场时机）· 非常重要】\n这一条决定新角色能不能自然出场。不要写成时间轴，写成【介入机会】：\n- hooks：给 4~6 个「信号 → 她怎么出现」，signal 是正文里可能出现的场景、物件、话题、或别人的一句话\n- 不要出现具体时刻（07:30 这类），因为那是主角的行程，不是她的\n- threads：她能挂靠到哪些既有事件线上（例如：便利店夜班 ←→ 主角深夜买东西）\n- presence：她不在场时怎么被感知（群消息、传闻、留下的东西）\n- rules：在场硬约束（每轮最多 3 人在场、只 1 个主场）\n- appearKeys 必须是【场景词】不是她的名字：便利店、收银台、夜班、巷口\n- dispatch：只写一行，会追加进世界书里共用的「出场调度表」。格式：场景信号 → 名字（定位；可由谁带进来）\n  例：便利店夜班 → 佐野澪（收银台后先抬眼；可由秦丽提起）\n【输出：严格 JSON，不要代码块，字段一个都不能少】\n{\n \"position\": {\"race\":\"\",\"relation\":\"\",\"informed\":\"\",\"timing\":\"\",\"tone\":\"\"},\n \"character\": {\n   \"name\": \"\",\n   \"nickname\": \"昵称1, 昵称2\",\n   \"tone\": \"一个定位词——一句说明\",\n   \"gender\": \"\", \"age\": \"\", \"race\": \"\", \"job\": \"\", \"tags\": \"三个短标签, 逗号分隔\",\n   \"rel_user\": \"与{{user}}的关系\",\n   \"informed\": \"知道什么、不知道什么\",\n   \"timing\": \"什么场景时段会自然出现\",\n   \"rel_others\": \"逐个列出与已知角色的关系\",\n   \"bg_origin\": \"出身，一段\",\n   \"bg_residence\": \"居住，一段\",\n   \"bg_exp1_title\": \"\", \"bg_exp1_text\": \"\",\n   \"bg_exp2_title\": \"\", \"bg_exp2_text\": \"\",\n   \"bg_exp3_title\": \"\", \"bg_exp3_text\": \"\",\n   \"ap_body\": \"身形与体格\",\n   \"ap_face\": \"发型与面部\",\n   \"ap_clothes\": \"日常服饰\",\n   \"ap_mark\": \"标志物\",\n   \"ap_habits\": \"2~3 个下意识小动作\",\n   \"sp_pace\": \"语速与音量\",\n   \"sp_quirk\": \"口癖\",\n   \"sp_call\": \"如何称呼{{user}}\",\n   \"sp_ex1\": \"台词\", \"sp_ex2\": \"台词\", \"sp_ex3\": \"台词\",\n   \"pe_surface\": \"别人看到的\",\n   \"pe_inner\": \"实际驱动的\",\n   \"pe_bottom\": \"什么情况下会翻脸或退缩\",\n   \"core\": [{\"tag\":\"行为内核名\",\"desc\":\"一段说明\"}],\n   \"traces\": [\"场景细节1\",\"场景细节2\",\"场景细节3\"]\n },\n \"body\": {\n   \"type\":\"整体类型\",\"ratio\":\"整体比例\",\"chest_size\":\"尺寸如38G\",\"chest_shape\":\"形状\",\"nipple\":\"乳头与乳晕\",\n   \"waist\":\"腰部特征\",\"whr\":\"腰臀比\",\"hip_shape\":\"臀形\",\"hip_texture\":\"臀部质感\",\n   \"pube\":\"毛发\",\"vulva_shape\":\"小穴形态\",\"vulva_color\":\"小穴颜色\",\"vulva_sensitivity\":\"小穴敏感度\",\"vulva_name\":\"名器说法\",\"vulva_feature\":\"小穴内部特征\",\n   \"anus_shape\":\"菊穴形态\",\"anus_color\":\"菊穴颜色\",\"anus_name\":\"菊穴名器说法\",\"anus_feature\":\"菊穴特征\",\n   \"legs\":\"腿部形态\",\"muscle_clarity\":\"肌肉清晰度\",\"muscle_spread\":\"肌肉分布\",\n   \"skin_color\":\"皮肤颜色\",\"skin_texture\":\"皮肤质感\",\"skin_feature\":\"皮肤特征\",\"posture\":\"体态\",\n   \"demi_name\":\"非人形态的姿态名称（人类角色填无）\",\"demi_manifest\":\"具体显化\",\"demi_aura\":\"整体气场\"\n },\n \"sex\": {\n   \"tag\":\"性标签（一句话总结）\",\n   \"sensitive\":[{\"part\":\"耳垂与颈部\",\"level\":\"高\",\"desc\":\"为什么敏感\"}],\n   \"weak_main\":\"主要生理弱点\",\"weak_main_how\":\"刺激方式\",\n   \"weak_sub\":\"次要生理弱点\",\"weak_sub_how\":\"刺激方式\",\n   \"weak_mind\":\"精神/言语弱点\",\"weak_mind_trigger\":\"触发词句/情景\",\"weak_mind_reaction\":\"触发反应\",\n   \"nsfw_behavior\":\"NSFW场景表现\",\"active_passive\":\"主动/被动倾向\",\"express\":\"表达方式\",\n   \"rhythm\":\"喜欢的节奏\",\"atmosphere\":\"喜欢的氛围\",\n   \"positions\":[{\"name\":\"姿势名\",\"why\":\"为什么喜欢\"}],\n   \"kinks\":[{\"name\":\"癖好名\",\"level\":\"仅幻想/愿意尝试/喜爱/痴迷\"}],\n   \"skills\":[{\"name\":\"技巧名称\",\"effect\":\"技巧效果\"}]\n }, },\n \"guide\": [{\"name\":\"行为路线短名\",\"trigger\":\"触发条件\",\"action\":\"动作表现\",\"detail\":\"重点细节\"}],\n \"appear\": {\"hooks\":[{\"signal\":\"正文出现什么信号（场景/物件/话题/别人的一句话）\",\"how\":\"她怎么出现\",\"first\":\"她的第一反应\",\"turn\":\"可能往哪儿走\"}],\"threads\":[\"可以挂靠的现有事件线\"],\"presence\":[\"她不在场时怎么被感知\"],\"rules\":[\"在场硬约束\"],\"never\":\"什么情况下她绝对不会出现\"},\n \"appearKeys\": [\"场景词1\",\"场景词2\"],\n \"dispatch\": \"一行，格式：场景信号 → 名字（一句话定位；可由谁带进来）\",\n \"keys\": [\"角色名\",\"昵称\"],\n \"coreUpdates\": [{\"entry\":\"人物关系速览\",\"change\":\"要追加的一行\"}],\n \"warnings\": [\"说明\"]\n}";
+const SYSTEM = "你是角色卡转世界书条目的转换器。把一个人物做成世界书里正式的、能被 AI 认知并主动调用的角色。\n\n【铁律】\n① 种族不改：素材里是什么种族就是什么，人类不改魅魔。\n② 设定照搬：素材写过的外貌、体型、服装、说话方式、口癖、行为习惯，一字不改。\n③ 素材没写的，允许按基调合理补全，但要补得像样、自成一体，不要敷衍留空。\n④ 世界以主卡为准：能和现有世界观融合就融合，实在冲突的丢弃。\n⑤ keys 里任何一项都不能含空格，一项一个词。**keys 必须包含角色名本身**（这是触发她的关键），再加 1~2 个昵称或别称。\n\n【关系是硬要求 · 关系到她能不能自然出场】\n- rel_user 必须写具体：不是「陌生人」「路过的人」，而是「同一栋楼的邻居，常在楼下碰见」这种\n- rel_list 至少要有一个具体的人，who 必须是「已存在」名单里的名字\n- how 要写清「这个人为什么会提到她」，例如：同事、同学、母子、老邻居\n- 如果素材里她跟谁都不认识，就给她安排一个既有的连接点（同一个单位、同一栋楼、同一条街），\n  不要写成孤立的人 —— 孤立的人没法被自然地提及\n\n【三条的边界，不要写重】\n- 角色卡 = 人设：基调、身份、背景、性格、语言、习惯动作。外貌只写发型面部、日常服饰、标志物，\n  以及一句整体轮廓（如丰腴、纤细），不写尺寸、不写私处。\n- 身体配置 = 身体：尺寸、形状、质感、私处、非人形态。所有身体细节都写在这里。\n- 性癖档案 = 性：敏感带、弱点、偏好、癖好、技巧。不重复身体配置里的数字。\n\n【关于 body（第2条·身体配置）】\n1:1 复刻下面这个格式，字段一个都不能少：\n<body_configuration character=\"名字\">\n整体身材: - 类型: [...]        整体比例: - 比例: [...]\n胸部: - 尺寸 / 形状 / 乳头与乳晕\n腰部: - 特征 / 腰臀比          臀部: - 形状 / 质感\n私处: - 小穴(毛发/形态/颜色/敏感度/名器说法/特征) - 菊穴(形态/颜色/名器说法/特征)\n腿部: - 形态                  肌肉线条: - 清晰度 / 分布\n其他体态特征: - 皮肤颜色 / 皮肤质感 / 皮肤特征 / 体态\n半妖形态: - 姿态名称 / 具体显化 / 整体气场   （纯人类角色写「无」，不要编造非人形态）\n</body_configuration>\n\n【关于 sex（第3条·性癖档案）】\n1:1 复刻下面这个格式：\n<sexual_profile character=\"名字\">\n性标签(总结性): \"[...]\"\nA. 敏感带: 敏感度评级 + 6 个部位（耳垂与颈部/背部与脊柱沟/胸部/腰腹与侧腹/大腿内侧/私密地带），每条写「等级 - 说明」\nB. 性弱点: 主要生理弱点 + 刺激方式 / 次要生理弱点 + 刺激方式 / 精神言语弱点 + 触发词句 + 触发反应\nC. 性格与偏好: NSFW场景表现 + 主动被动倾向 + 表达方式 + 喜好的性风格(节奏/氛围) + 喜好的性姿势(2~3 个)\nD. 特殊癖好: 接受度评级 + 6 项左右（每项标 仅幻想/愿意尝试/喜爱/痴迷）\nE. 特殊性技巧: 1~2 个，每个写 技巧名称 + 技巧效果\n</sexual_profile>\n\n写这两条时要结合本角色的种族、权能、体型来设计，不要写成通用模板。\n【关于 appear（第4条·出场时机）· 非常重要】\n这一条决定新角色能不能自然出场。不要写成时间轴，写成【介入机会】：\n- hooks：给 4~6 个「信号 → 她怎么出现」，signal 是正文里可能出现的场景、物件、话题、或别人的一句话\n- 不要出现具体时刻（07:30 这类），因为那是主角的行程，不是她的\n- threads：她能挂靠到哪些既有事件线上（例如：便利店夜班 ←→ 主角深夜买东西）\n- presence：她不在场时怎么被感知（群消息、传闻、留下的东西）\n- rules：在场硬约束（每轮最多 3 人在场、只 1 个主场）\n- appearKeys 必须是【场景词】不是她的名字：便利店、收银台、夜班、巷口\n- dispatch：只写一行，会追加进世界书里共用的「出场调度表」。格式：场景信号 → 名字（定位；可由谁带进来）\n  例：便利店夜班 → 佐野澪（收银台后先抬眼；可由秦丽提起）\n【输出：严格 JSON，不要代码块，字段一个都不能少】\n{\n \"position\": {\"race\":\"\",\"relation\":\"\",\"informed\":\"\",\"timing\":\"\",\"tone\":\"\"},\n \"character\": {\n   \"name\": \"\",\n   \"nickname\": \"昵称1, 昵称2\",\n   \"tone\": \"一个定位词——一句说明\",\n   \"gender\": \"\", \"age\": \"\", \"race\": \"\", \"job\": \"\", \"tags\": \"三个短标签, 逗号分隔\",\n   \"rel_user\": \"与{{user}}的关系\",\n   \"informed\": \"知道什么、不知道什么\",\n   \"timing\": \"什么场景时段会自然出现\",\n   \"rel_list\": [{\"who\": \"必须是「已存在」名单或主角身边出现过的人里的名字\", \"how\": \"关系一句话，要能说明她为什么会被这个人提起\"}],\n   \"bg_origin\": \"出身，一段\",\n   \"bg_residence\": \"居住，一段\",\n   \"bg_exp1_title\": \"\", \"bg_exp1_text\": \"\",\n   \"bg_exp2_title\": \"\", \"bg_exp2_text\": \"\",\n   \"bg_exp3_title\": \"\", \"bg_exp3_text\": \"\",\n   \"ap_body\": \"身形与体格\",\n   \"ap_face\": \"发型与面部\",\n   \"ap_clothes\": \"日常服饰\",\n   \"ap_mark\": \"标志物\",\n   \"ap_habits\": \"2~3 个下意识小动作\",\n   \"sp_pace\": \"语速与音量\",\n   \"sp_quirk\": \"口癖\",\n   \"sp_call\": \"如何称呼{{user}}\",\n   \"sp_ex1\": \"台词\", \"sp_ex2\": \"台词\", \"sp_ex3\": \"台词\",\n   \"pe_surface\": \"别人看到的\",\n   \"pe_inner\": \"实际驱动的\",\n   \"pe_bottom\": \"什么情况下会翻脸或退缩\",\n   \"core\": [{\"tag\":\"行为内核名\",\"desc\":\"一段说明\"}],\n   \"traces\": [\"场景细节1\",\"场景细节2\",\"场景细节3\"]\n },\n \"body\": {\n   \"type\":\"整体类型\",\"ratio\":\"整体比例\",\"chest_size\":\"尺寸如38G\",\"chest_shape\":\"形状\",\"nipple\":\"乳头与乳晕\",\n   \"waist\":\"腰部特征\",\"whr\":\"腰臀比\",\"hip_shape\":\"臀形\",\"hip_texture\":\"臀部质感\",\n   \"pube\":\"毛发\",\"vulva_shape\":\"小穴形态\",\"vulva_color\":\"小穴颜色\",\"vulva_sensitivity\":\"小穴敏感度\",\"vulva_name\":\"名器说法\",\"vulva_feature\":\"小穴内部特征\",\n   \"anus_shape\":\"菊穴形态\",\"anus_color\":\"菊穴颜色\",\"anus_name\":\"菊穴名器说法\",\"anus_feature\":\"菊穴特征\",\n   \"legs\":\"腿部形态\",\"muscle_clarity\":\"肌肉清晰度\",\"muscle_spread\":\"肌肉分布\",\n   \"skin_color\":\"皮肤颜色\",\"skin_texture\":\"皮肤质感\",\"skin_feature\":\"皮肤特征\",\"posture\":\"体态\",\n   \"demi_name\":\"非人形态的姿态名称（人类角色填无）\",\"demi_manifest\":\"具体显化\",\"demi_aura\":\"整体气场\"\n },\n \"sex\": {\n   \"tag\":\"性标签（一句话总结）\",\n   \"sensitive\":[{\"part\":\"耳垂与颈部\",\"level\":\"高\",\"desc\":\"为什么敏感\"}],\n   \"weak_main\":\"主要生理弱点\",\"weak_main_how\":\"刺激方式\",\n   \"weak_sub\":\"次要生理弱点\",\"weak_sub_how\":\"刺激方式\",\n   \"weak_mind\":\"精神/言语弱点\",\"weak_mind_trigger\":\"触发词句/情景\",\"weak_mind_reaction\":\"触发反应\",\n   \"nsfw_behavior\":\"NSFW场景表现\",\"active_passive\":\"主动/被动倾向\",\"express\":\"表达方式\",\n   \"rhythm\":\"喜欢的节奏\",\"atmosphere\":\"喜欢的氛围\",\n   \"positions\":[{\"name\":\"姿势名\",\"why\":\"为什么喜欢\"}],\n   \"kinks\":[{\"name\":\"癖好名\",\"level\":\"仅幻想/愿意尝试/喜爱/痴迷\"}],\n   \"skills\":[{\"name\":\"技巧名称\",\"effect\":\"技巧效果\"}]\n }, },\n \"guide\": [{\"name\":\"行为路线短名\",\"trigger\":\"触发条件\",\"action\":\"动作表现\",\"detail\":\"重点细节\"}],\n \"appear\": {\"hooks\":[{\"signal\":\"正文出现什么信号（场景/物件/话题/别人的一句话）\",\"how\":\"她怎么出现\",\"first\":\"她的第一反应\",\"turn\":\"可能往哪儿走\"}],\"threads\":[\"可以挂靠的现有事件线\"],\"presence\":[\"她不在场时怎么被感知\"],\"rules\":[\"在场硬约束\"],\"never\":\"什么情况下她绝对不会出现\"},\n \"appearKeys\": [\"场景词1\",\"场景词2\"],\n \"dispatch\": \"一行，格式：场景信号 → 名字（一句话定位；可由谁带进来）\",\n \"keys\": [\"角色名\",\"昵称\"],\n \"coreUpdates\": [{\"entry\":\"人物关系速览\",\"change\":\"要追加的一行\"}],\n \"warnings\": [\"说明\"]\n}";
 
-const DETECT_SYSTEM = "你是「新人物探测器」。读一段角色扮演正文，找出应该被做成世界书角色的人物。\n\n【要求】\n1. 只列真正作为人物出现过的（有称呼、有动作、有对话），不要列地点、物品、组织。\n2. 排除这些已经在世界书里的人：<已存在>\n3. 排除 {{user}} 和纯泛指的路人（「有人」「路人」这种没有任何指代信息的）。\n4. 有些人只被身份指代、整段没出现名字，例如「那个店员」「老太太」「穿和服的女人」「管理员的老婆」。\n   这类也要列出来：\n   - name 填最简短的指代（4 字以内，如「店员」「老太太」）\n   - alias 填正文里用过的其他说法（数组，如 [\"收银员\",\"那个女孩\"]）\n   - unnamed 填 true\n5. 有名字的人 unnamed 填 false，alias 填昵称或别的叫法（没有就给空数组）。\n6. 每个人给一句为什么值得做成角色。\n\n【输出】严格 JSON：\n{\"candidates\":[{\"name\":\"\",\"alias\":[],\"unnamed\":false,\"reason\":\"\",\"confidence\":\"high|medium|low\"}]}";
+const DETECT_SYSTEM = "你是「新人物探测器」。读一段角色扮演正文，找出应该被做成世界书角色的人物。\n\n【要求】\n1. 只列真正作为人物出现过的（有称呼、有动作、有对话），不要列地点、物品、组织。\n2. 排除这些已经在世界书里的人：<已存在>\n3. 排除 {{user}} 和纯泛指的路人（「有人」「路人」这种没有任何指代信息的）。\n4. 有些人只被身份指代、整段没出现名字，例如「那个店员」「老太太」「穿和服的女人」「管理员的老婆」。\n   这类也要列出来：\n   - name 填最简短的指代（4 字以内，如「店员」「老太太」）\n   - alias 填正文里用过的其他说法（数组，如 [\"收银员\",\"那个女孩\"]）\n   - unnamed 填 true\n5. 有名字的人 unnamed 填 false，alias 填昵称或别的叫法（没有就给空数组）。\n6. 每个人给一句为什么值得做成角色。\n\n【输出】严格 JSON，不要代码块：\n{\"candidates\":[{\"name\":\"\",\"alias\":[],\"unnamed\":false,\"reason\":\"\",\"confidence\":\"high|medium|low\"}],\n \"director\":{\"name\":\"\",\"why\":\"\"}}\n\n【director 字段 · 顺带判断谁该出场】\n如果输入里给了 <可出场> 列表，从中挑一个最适合在本轮正文里出现的人。\n- 只挑场景真的对得上的：他走进厨房，就挑常在厨房的人；没对上就填空字符串\n- 不要为了让人出场而硬凑，空着是正常结果\n- name 必须和 <可出场> 列表里的名字完全一致\n- 本轮已经在场、或刚刚才出现过的，不要选\n- why 写一句话理由，引用正文里的具体细节\n";
 
 const DEFAULTS = {
     targetBook: '', source: 'chat', name: '', idea: '', backups: {},
@@ -589,6 +595,7 @@ const DEFAULTS = {
     xpLast: [],            // 上一个角色用过的性癖（避免相邻重复）
     scanDepth: 50,         // 素材收集：翻多少楼（加人时用一次）
     detectDepth: 8,        // 新人检测：常规只看多少楼（每轮都跑，必须小）
+    followCharBook: true,   // 自动跟随角色卡绑定的世界书
     detectMarks: {},       // 每个聊天上次检测到的楼层（用于补扫）
     catchUpMax: 60,        // 补扫上限，防止一次拉太多
     advanced: false,       // 高级模式
@@ -598,7 +605,18 @@ const DEFAULTS = {
     oplog: {},             // 操作日志（替代整本快照）
     entryHash: {},         // 条目内容指纹（检测手改）
     timelineEntry: '行动路线', // 出场时机写进哪条常驻条目
-    dispatchLimit: 15,     // 出场调度表最多几行
+    director: false,          // 出场导演开关
+    directorGap: 8,           // 至少多少楼没出场才推荐
+    directorChance: 0,        // 场景不匹配时强插的概率 %
+    directorAllowRandom: false, // 允许随机偶遇（默认关，关着时上面的概率不生效）
+    directorIdleOnly: true,   // 只在空闲场景出手
+    directorPos: 'in_chat',   // 注入位置
+    directorDepth: 4,         // 注入深度
+    directorNotify: true,     // 导演动手时弹提示
+    dirLog: {},               // 每个聊天的出场记录
+    directorCharsExtra: [],   // 手动补充的角色名（任何命名规范都能用）
+    dirScan: {},              // LLM 扫世界书的缓存（按书 + 指纹）
+
 };
 
 // ── 基础 ─────────────────────────────────────────
@@ -606,6 +624,24 @@ const clean = s => String(s == null ? '' : s).replace(/\uFFFD/g, '').trim();
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+// 当前角色卡绑定的世界书
+function boundBook() {
+    try {
+        const ch = ctx.characters && ctx.characters[ctx.characterId];
+        const w = ch && ch.data && ch.data.extensions && ch.data.extensions.world;
+        return w ? String(w) : '';
+    } catch (e) { return ''; }
+}
+
+// 实际写入/检测用的书：默认跟随角色卡绑定，没绑就用手动选的
+function effectiveBook() {
+    const s = settings();
+    if (s.followCharBook !== false) {
+        const b = boundBook();
+        if (b) return b;
+    }
+    return s.targetBook || '';
+}
 function store() {
     // 不同酒馆版本取设置容器的位置不一样，逐个兜底
     const holder = ctx.extensionSettings || globalThis.extension_settings
@@ -662,10 +698,21 @@ function apiBase() {
 let cachedSecret = { key: '', id: '' };
 
 // 服务器中转需要把密钥存进酒馆密钥库，才能用 custom 通道
+// 有些端点必须带特定请求头，自动补上，省得用户去查文档
+function resolveHeaders() {
+    const s = settings();
+    let txt = String(s.headers || "").trim();
+    const url = String(s.apiUrl || "");
+    if (/opencode\.ai/i.test(url) && !/x-opencode-session/i.test(txt)) {
+        txt = (txt ? txt + String.fromCharCode(10) : "") + "x-opencode-session: " + (MODULE.toLowerCase().replace(/[^a-z0-9-]/g, "-"));
+    }
+    return txt;
+}
+
 async function ensureSecret() {
     const s = settings();
     const key = String(s.apiKey || '').trim();
-    if (!key) throw new Error('还没填 API 密钥');
+    if (!key) return null;                     // 有些端点不需要密钥，不要硬报错
     if (cachedSecret.key === key && cachedSecret.id) return cachedSecret.id;
 
     const res = await fetch('/api/secrets/write', {
@@ -677,6 +724,39 @@ async function ensureSecret() {
     if (!j.id) throw new Error('把密钥存进酒馆失败');
     cachedSecret = { key, id: j.id };
     return j.id;
+}
+
+// 把底层网络错误翻译成能照做的提示
+function friendlyNetError(msg) {
+    const m = String(msg || "");
+    if (/ECONNREFUSED|Connection refused/i.test(m)) {
+        const port = (m.match(/127\.0\.0\.1:(\d+)/) || [])[1] || "?";
+        return m + String.fromCharCode(10, 10) +
+            "【本机代理没开】酒馆 config.yaml 里的 requestProxy 指向了 127.0.0.1:" + port + "，但这个端口上没有程序在听。" + String.fromCharCode(10) +
+            "三种处理方式任选其一：" + String.fromCharCode(10) +
+            "· 启动代理（Clash/V2Ray 之类），或把 requestProxy.url 改成代理实际监听的端口" + String.fromCharCode(10) +
+            "· 把这个端点加进 requestProxy.bypass 列表（直连）" + String.fromCharCode(10) +
+            "· 把 requestProxy.enabled 设为 false（如果不需要代理）" + String.fromCharCode(10) +
+            "改完要重启酒馆才生效。";
+    }
+    if (/ETIMEDOUT|timeout|timed out/i.test(m)) {
+        return m + String.fromCharCode(10, 10) + "【超时】端点没在限定时间内响应。可能是代理慢、也可能是端点本身挂了。";
+    }
+    if (/Bad Request|HTTP 400/i.test(m)) {
+        const s0 = settings();
+        let extra = '';
+        if (/opencode\.ai/i.test(String(s0.apiUrl || '')) && !/x-opencode-session/i.test(String(s0.headers || ''))) {
+            extra = String.fromCharCode(10, 10) + '【opencode 端点】它必须带 x-opencode-session 请求头，否则一律返回 400。' + String.fromCharCode(10) + '插件会自动补一个；如果仍然 400，请检查端点 URL 是否正确（例如 https://opencode.ai/zen/go/v1）。';
+        }
+        return m + extra;
+    }
+    if (/ENOTFOUND|getaddrinfo/i.test(m)) {
+        return m + String.fromCharCode(10, 10) + "【域名解析失败】检查端点 URL 拼写，或者当前网络连不上这个域名。";
+    }
+    if (/Failed to fetch|NetworkError|CORS/i.test(m) && !/HTTP \d/i.test(m)) {
+        return m + String.fromCharCode(10, 10) + "【浏览器直连被挡】如果端点不允许跨域，把「发送通道」改成「酒馆服务器中转」。";
+    }
+    return m;
 }
 
 async function callLLM(prompt) {
@@ -699,8 +779,8 @@ async function callLLM(prompt) {
             body: JSON.stringify({
                 chat_completion_source: 'custom',
                 custom_url: base,
-                custom_include_headers: String(s.headers || '').trim(),
-                secret_id: sid,
+                custom_include_headers: resolveHeaders(),
+                secret_id: sid || undefined,
                 model: s.model,
                 messages: [{ role: 'user', content: prompt }],
                 max_tokens: Number(s.maxTokens) || 6000,
@@ -711,8 +791,8 @@ async function callLLM(prompt) {
         const text = await res.text();
         let j = null;
         try { j = JSON.parse(text); } catch (e) { }
-        if (j && j.error) throw new Error('端点报错：' + (j.error.message || JSON.stringify(j.error).slice(0, 200)));
-        if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + text.slice(0, 200));
+        if (j && j.error) throw new Error(friendlyNetError('端点报错：' + (j.error.message || JSON.stringify(j.error).slice(0, 200))));
+        if (!res.ok) throw new Error(friendlyNetError('HTTP ' + res.status + ' ' + text.slice(0, 200)));
         const ch = j?.choices?.[0]?.message;
         if (!ch) throw new Error('返回里没有内容：' + text.slice(0, 200));
         return String(ch.content || ch.reasoning_content || '');
@@ -883,13 +963,13 @@ function gatherFromChar() {
 }
 
 // ── 状态 ─────────────────────────────────────────
-const state = { tab: 'add', plan: null, books: [], entries: [], viewComment: null, candidates: [], detecting: false, detectedFor: '', detectError: '', drafts: [], genBusy: false, curAlias: [], updateChars: [], updateChar: null, updatePlan: null, updateDiff: null };
+const state = { tab: 'add', plan: null, books: [], candidates: [], detecting: false, detectedFor: '', detectError: '', drafts: [], genBusy: false, curAlias: [], existingNames: new Set(), updateChars: [], updateChar: null, updatePlan: null, updateDiff: null };
 
 // ── 手动检测（只找人不生成） ─────────────────────
 async function detectCandidates(force) {
     const dp = detectPool();
     const chat = dp.pool;
-    const book = settings().targetBook;
+    const book = effectiveBook();
     const cacheKey = dp.len + '|' + book;
     if (!force && state.detectedFor === cacheKey) return;
 
@@ -903,27 +983,83 @@ async function detectCandidates(force) {
         const recent = dp.pool.map(m => String(m.mes || m.message || '')).filter(Boolean).join(NL2).slice(0, 12000);
         if (!recent.trim()) return;
 
-        let existing = '';
-        if (book) {
-            const d = await getBook(book);
-            const es = Object.values(d.entries || {});
-            const names = new Set();
-            for (const e of es) {
-                const c = String(e.comment || '');
-                if (/^(TavernDB|AUTO-)/.test(c)) continue;
-                names.add(c);
-                for (const k of (e.key || [])) names.add(String(k));
-            }
-            for (const dr of (state.drafts || [])) names.add(dr.name);
-            existing = [...names].slice(0, 150).join('、');
+        // 已有角色名单：优先用目标世界书，没选就自动取角色卡绑定的那本
+        let useBook = book;
+        if (!useBook) {
+            try {
+                const ch = ctx.characters && ctx.characters[ctx.characterId];
+                const w = ch && ch.data && ch.data.extensions && ch.data.extensions.world;
+                if (w) { useBook = w; console.log('[命运织机] 没选目标书，自动使用角色卡绑定的：' + w); }
+            } catch (e) { /* ignore */ }
         }
+        state.existingNames = new Set();
+        if (useBook) {
+            try {
+                const d = await getBook(useBook);
+                const es = Object.values(d.entries || {});
+                for (const e of es) {
+                    const c = String(e.comment || '');
+                    if (/^(TavernDB|AUTO-)/.test(c)) continue;
+                    state.existingNames.add(c);
+                    for (const k of (e.key || [])) state.existingNames.add(String(k));
+                }
+            } catch (e) { console.warn('[命运织机] 读世界书失败，无法排除已有角色', e); }
+        }
+        // 当前角色卡和 persona 也算已有
+        try {
+            const ch = ctx.characters && ctx.characters[ctx.characterId];
+            if (ch && ch.name) state.existingNames.add(String(ch.name));
+            if (ctx.name2) state.existingNames.add(String(ctx.name2));
+        } catch (e) { /* ignore */ }
+        for (const dr of (state.drafts || [])) if (dr.name) state.existingNames.add(String(dr.name));
+        const existing = [...state.existingNames].slice(0, 200).join('、');
 
-        const prompt = activeDetect().replace('<已存在>', existing || '（无）') + NL2 + genderRule() + NL2 + '===== 正文 =====' + NL2 + recent;
+        // 顺带让模型挑一个本轮该出场的人（复用同一次请求，不额外花钱）
+        let castBlock = '';
+        try {
+            const cache = state.dirCache;
+            if (cache && cache.chars && cache.chars.length) {
+                const texts2 = msgTexts();
+                const log2 = dirLog();
+                const n2 = texts2.length;
+                const rows2 = [];
+                for (const c of cache.chars) {
+                    let last = log2[c.name] !== undefined ? log2[c.name] : -1;
+                    if (last < 0) { for (let i2 = n2 - 1; i2 >= 0; i2--) { if (texts2[i2].indexOf(c.name) >= 0) { last = i2; break; } } }
+                    const gap = last < 0 ? n2 : (n2 - 1 - last);
+                    if (gap < 2) continue;
+                    const sc = (c.scenes || []).slice(0, 5).join('、');
+                    rows2.push('- ' + c.name + '（' + gap + ' 楼未出场）' + (sc ? '　常见场景：' + sc : ''));
+                }
+                if (rows2.length) castBlock = '<可出场>' + NL2 + rows2.slice(0, 15).join(NL2) + NL2 + '</可出场>';
+            }
+        } catch (e) { castBlock = ''; }
+
+        const prompt = activeDetect().replace('<已存在>', existing || '（无）') + NL2 + genderRule() + NL2 +
+            (castBlock ? castBlock + NL2 : '') + '===== 正文 =====' + NL2 + recent;
         const raw = await callLLM(prompt);
         const jj = parseLoose(raw);
+        if (jj && jj.director && jj.director.name) {
+            const nm2 = String(jj.director.name).trim();
+            const known2 = (state.dirCache && state.dirCache.chars) || [];
+            if (known2.some(function (c) { return c.name === nm2; })) {
+                state.dirSuggestion = { name: nm2, why: String(jj.director.why || '').trim(), at: Date.now() };
+                console.log('[命运织机] 模型建议本轮出场：' + nm2 + (jj.director.why ? '（' + jj.director.why + '）' : ''));
+            } else {
+                state.dirSuggestion = null;
+            }
+        } else {
+            state.dirSuggestion = null;
+        }
         state.candidates = ((jj && jj.candidates) || [])
             .filter(c => c && c.name && String(c.name).trim().length <= 12)
-            .filter(c => !existing.includes(String(c.name).trim()))
+            .filter(c => {
+                const n = String(c.name).trim();
+                if (!n) return false;
+                if (state.existingNames.has(n)) return false;
+                for (const x of state.existingNames) { if (x && x.indexOf(n) >= 0) return false; }
+                return true;
+            })
             .slice(0, 10)
             .map(c => ({ name: String(c.name).trim(), alias: Array.isArray(c.alias) ? c.alias.map(String) : [], unnamed: !!c.unnamed, reason: String(c.reason || ''), confidence: String(c.confidence || 'medium') }));
         state.detectedFor = cacheKey;
@@ -988,7 +1124,7 @@ async function autoRun() {
 
     autoBusy = true;
     try {
-        const book = settings().targetBook || state.books[0];
+        const book = effectiveBook() || state.books[0];
         if (!book) return;
 
         // 1) 找候选人
@@ -1078,6 +1214,7 @@ function ensurePanel() {
             <div class="g">主功能</div>
             <div class="it" data-tab="add">添加角色</div>
             <div class="it" data-tab="update">更新角色</div>
+            <div class="it" data-tab="director">出场导演</div>
             <div class="it" data-tab="api">API 配置</div>
             <div class="it" data-tab="overview">概览</div>
             <div class="g">数据</div>
@@ -1105,6 +1242,18 @@ function ensurePanel() {
 }
 
 function openPanel() {
+    // 导演开着的话，启动就把素材读进来（否则刷新后静默失效）
+    // 老版本默认 15% 硬插，升级后强制关掉（避免用户被静默硬插）
+    try {
+        const st = settings();
+        if (st.directorAllowRandom === undefined) { st.directorAllowRandom = false; st.directorChance = 0; persist(); }
+    } catch (e) { /* ignore */ }
+    if (settings().director && settings().targetBook) {
+        refreshDirCache().then(function () {
+            console.log('[命运织机] 出场导演素材已加载 ' + ((state.dirCache && state.dirCache.chars.length) || 0) + ' 个角色');
+        }).catch(function (e) { console.warn('[命运织机] 导演素材加载失败', e); });
+    }
+
     ensurePanel();
     $('ac-overlay').style.display = 'flex';
     state.tab = 'add';
@@ -1155,6 +1304,12 @@ function renderInner() {
         }).catch(function (e) {
             m.innerHTML = '<div class="ac-card"><div class="h">读取失败</div><div class="ac-warn">' + esc(e.message || e) + '</div></div>';
         });
+        return;
+    }
+    if (state.tab === 'director') {
+        m.innerHTML = viewDirector();
+        wireDirector();
+        if (!state.dirCache) { refreshDirCache().then(function () { if (state.tab === 'director') render(); }).catch(function () {}); }
         return;
     }
     if (state.tab === 'api') { m.innerHTML = viewApi(); wireApi(); return; }
@@ -1259,7 +1414,8 @@ function viewAdd() {
             <button class="ac-btn" id="ac-bookok">确定</button>
             <button class="ac-btn" id="ac-bookreload" title="重新读取世界书列表">↻</button>
           </div>
-          <div class="hint" id="ac-bookstate">当前写入目标：<b>${esc(s.targetBook || '(未选择)')}</b></div>
+          <label class="ac-sw" style="margin-top:10px"><input type="checkbox" id="ac-followbook"${s.followCharBook !== false ? ' checked' : ''} /> 跟随角色卡绑定的世界书</label>
+        <div class="hint" id="ac-bookstate">实际写入：<b>${esc(effectiveBook() || '(未选择)')}</b>${s.followCharBook !== false && boundBook() ? '　（跟随角色卡）' : ''}</div>
         </div>
         <div class="ac-sub" style="margin-top:12px;">
           <div class="ac-sub-h">自动化开关</div>
@@ -1301,6 +1457,10 @@ function wireAdd() {
     $('ac-detectdepth')?.addEventListener('change', e => { s.detectDepth = Number(e.target.value) || 8; persist(); });
     $('ac-scanDepth')?.addEventListener('change', e => { s.scanDepth = Number(e.target.value) || 0; persist(); });
     $('ac-idea')?.addEventListener('input', e => { s.idea = e.target.value; persist(); });
+    $('ac-followbook')?.addEventListener('change', function (e) {
+        settings().followCharBook = e.target.checked;
+        persist(); render();
+    });
     $('ac-book')?.addEventListener('change', () => {
         const st = $('ac-bookstate');
         if (st) st.innerHTML = '当前写入目标：<b>' + esc($('ac-book').value) + '</b>（点确定保存）';
@@ -1406,6 +1566,20 @@ function toast(desc, onView, ms) {
     return el;
 }
 
+// 导演提示：轻量、短、和别的提示区分开
+function toastDirector(kind, name, gap, text) {
+    if (!settings().directorNotify) return;
+    const el = toast('', null, 5000);
+    el.classList.add('dir');
+    if (kind === 'mild') el.classList.add('mild');
+    const title = kind === 'mild' ? '导演 · 轻提' : (kind === 'llm' ? '导演 · 出场（模型判断）' : '导演 · 出场');
+    const d = el.querySelector('.d');
+    const tt = el.querySelector('.t');
+    const ic = el.querySelector('.ico');
+    if (ic) ic.textContent = kind === 'mild' ? '提' : '导';
+    if (tt) tt.textContent = title;
+    if (d) d.textContent = name + '（' + gap + ' 楼未出场）' + (kind === 'mild' ? ' —— 只提及，不出场' : ' —— 已让 AI 考虑让她登场');
+}
 // 进行中提示：不自动消失，由调用方结束
 function toastProgress(text, onView) {
     const el = toast(text, onView, 0);
@@ -1437,7 +1611,13 @@ function buildCharacterYaml(c) {
     o.push("  与{{user}}的关系: " + Y(c.rel_user));
     o.push("  知情程度: " + Y(c.informed));
     o.push("  出场时机: " + Y(c.timing));
-    o.push("  与其他角色的关系: " + Y(c.rel_others));
+    const rl = Array.isArray(c.rel_list) ? c.rel_list.filter(function (x) { return x && x.who; }) : [];
+    if (rl.length) {
+        o.push("  与其他角色的关系:");
+        for (const r of rl) o.push("    - " + Y(r.who) + ": " + Y(r.how));
+    } else {
+        o.push("  与其他角色的关系: " + Y(c.rel_others));
+    }
     o.push("");
     o.push("背景:");
     o.push("  出身: |");
@@ -1483,22 +1663,6 @@ function buildCharacterYaml(c) {
     o.push("</character>");
     return o.join(String.fromCharCode(10));
 }
-
-function buildNsfwYaml(n) {
-    const o = [];
-    o.push("<NSFW档案>");
-    o.push("特质:");
-    for (const x of (n.traits || [])) { if (x) o.push("  - " + Y(x)); }
-    o.push("身体反应: " + Y(n.body));
-    o.push("敏感点: " + Y(n.sensitive));
-    o.push("会说的话:");
-    for (const x of (n.willSay || [])) { if (x) o.push("  - \"" + Y(x) + "\""); }
-    o.push("不会说的话: " + Y(n.wontSay));
-    o.push("底线与突破条件: " + Y(n.limit));
-    o.push("</NSFW档案>");
-    return o.join(String.fromCharCode(10));
-}
-
 function buildGuideText(g) {
     const o = [];
     (g || []).forEach((x, i) => {
@@ -1509,43 +1673,6 @@ function buildGuideText(g) {
         o.push("  重点细节: " + Y(x.detail));
         o.push("");
     });
-    return o.join(String.fromCharCode(10)).trim();
-}
-
-// 第 4 条：出场时机（关键词是场景词，不是人名）
-function buildAppearYaml(a, name) {
-    if (!a) return '';
-    const hooks = a.hooks || [];
-    if (!hooks.length && !(a.threads || []).length) return '';
-    const o = [];
-    o.push('使用说明: 指导AI在推进日常剧情时，什么情况下可以让' + Y(name) + '自然介入。不要硬拉她出场，只在信号对上时才让她进来。');
-    o.push('角色: ' + Y(name));
-    o.push('');
-    o.push('【介入机会】');
-    for (const h of hooks) {
-        if (!h || (!h.signal && !h.how)) continue;
-        o.push('  信号: ' + Y(h.signal));
-        if (h.how) o.push('    她怎么出现: ' + Y(h.how));
-        if (h.first) o.push('    第一反应: ' + Y(h.first));
-        if (h.turn) o.push('    可能走向: ' + Y(h.turn));
-    }
-    if ((a.threads || []).length) {
-        o.push('');
-        o.push('【可挂靠的事件线】');
-        for (const x of a.threads) if (x) o.push('  · ' + Y(x));
-    }
-    if ((a.presence || []).length) {
-        o.push('');
-        o.push('【不在场时怎么被感知】');
-        for (const x of a.presence) if (x) o.push('  · ' + Y(x));
-    }
-    o.push('');
-    o.push('【在场规则 · 硬约束】');
-    const rules = (a.rules || []).filter(Boolean);
-    if (!rules.length) rules.push('每轮场景最多 3 个角色在场，其中 1 个是主场');
-    for (const x of rules) o.push('  · ' + Y(x));
-    o.push('  她不是主场时，只通过一条短信、门口的一双鞋、别人转述的一句话出现，不露脸。');
-    if (a.never) { o.push(''); o.push('【不会出现】'); o.push('  · ' + Y(a.never)); }
     return o.join(String.fromCharCode(10)).trim();
 }
 // 出场时机写进行动路线用的紧凑段落（不是独立条目）
@@ -1665,6 +1792,13 @@ function planToEntries(plan) {
         keys = [nm];
         for (const x of String(c.nickname || "").split(/[,，、\s]+/)) if (x && x !== nm) keys.push(x);
     }
+    // 强制：角色名本身必须在关键词里，否则导演注入名字时扫不到任何条目
+    if (!keys.includes(nm)) keys.unshift(nm);
+    // 昵称也尽量带上（模型给的第一个昵称）
+    for (const x of String(c.nickname || '').split(/[,，、\s]+/)) {
+        const nn5 = String(x).trim();
+        if (nn5 && nn5 !== nm && !keys.includes(nn5) && keys.length < 8) keys.push(nn5);
+    }
     keys = [...new Set(keys)].slice(0, 8);
     const out = [
         { comment: "角色卡 " + nm, content: buildCharacterYaml(c), keys, constant: false },
@@ -1689,7 +1823,6 @@ function fRow(label, path, val, type) {
 function fGroup(title, inner) {
     return '<div class="ac-sub"><div class="ac-sub-h">' + title + '</div>' + inner + '</div>';
 }
-
 
 const charCount = s => String(s || "").replace(/\s/g, "").length;
 
@@ -1755,7 +1888,7 @@ function renderResult() {
         fRow('与{{user}}的关系', 'character.rel_user', c.rel_user, 'ta') +
         fRow('知情程度', 'character.informed', c.informed, 'ta') +
         fRow('出场时机', 'character.timing', c.timing, 'ta') +
-        fRow('与其他角色的关系', 'character.rel_others', c.rel_others, 'ta'));
+        fRow('与其他角色的关系（一行一个：名字: 关系）', 'character.rel_others', (Array.isArray(c.rel_list) && c.rel_list.length ? c.rel_list.map(function (x) { return x.who + ': ' + x.how; }).join('\n') : c.rel_others), 'ta'));
     html += fGroup('背景',
         fRow('出身', 'character.bg_origin', c.bg_origin, 'ta') +
         fRow('居住', 'character.bg_residence', c.bg_residence, 'ta') +
@@ -1861,6 +1994,15 @@ function collectPlan() {
         if (path === 'bodyText') { p.bodyText = v; return; }
         if (path === 'sexText') { p.sexText = v; return; }
         if (path === 'appearKeysText') { p.appearKeys = v.split(/[,，、\s]+/).map(x => x.trim()).filter(Boolean); return; }
+        if (path === 'character.rel_others') {
+            p.character = p.character || {};
+            p.character.rel_others = v;
+            p.character.rel_list = String(v || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+                const a = l.split(/[:：]/);
+                return { who: (a[0] || '').trim(), how: a.slice(1).join('：').trim() };
+            }).filter(function (x) { return x.who; });
+            return;
+        }
         if (path === 'appearSlots') {
             p.appear = p.appear || {};
             p.appear.slots = v.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
@@ -1994,53 +2136,7 @@ async function generatePlan(opt) {
 
 // 把一份 plan 写进世界书（自动写入也走这里）
 // 出场调度表：所有角色共用一条，常驻，成本极低
-const DISPATCH_NAME = '出场调度表';
 
-function dispatchHeader() {
-    return [
-        '使用说明: 以下是可以在日常剧情里自然出现的人物。信号对上时可以考虑让他们介入，但每轮最多 3 人在场。',
-        '不要硬拉人出场；不在场的人只能通过短信、物品、别人转述被感知。',
-        '',
-        '【可出场人物】',
-    ].join(String.fromCharCode(10));
-}
-
-// 把一行写进调度表（有则替换，无则追加），返回是否改动
-function upsertDispatch(ent, line, name, nextId) {
-    const text = String(line || '').trim();
-    if (!text) return { changed: false };
-    const hit = Object.entries(ent).find(function (x) { return String(x[1].comment) === DISPATCH_NAME; });
-    if (hit) {
-        const body = String(hit[1].content || '');
-        const lines = body.split(String.fromCharCode(10));
-        const shortName = String(name || '').trim();
-        const idx = lines.findIndex(function (l) { return shortName && l.indexOf(shortName) >= 0 && l.indexOf('→') >= 0; });
-        if (idx >= 0) { if (lines[idx] === text) return { changed: false }; lines[idx] = text; }
-        else { while (lines.length && !lines[lines.length - 1].trim()) lines.pop(); lines.push(text); }
-        hit[1].content = lines.join(String.fromCharCode(10));
-        hit[1].constant = true;
-        const lim = Number(settings().dispatchLimit) || 15;
-        const n = hit[1].content.split(String.fromCharCode(10)).filter(function (l) { return l.indexOf('→') >= 0; }).length;
-        return { changed: true, count: n, overflow: n > lim, limit: lim };
-    }
-    const e = nextId();
-    ent[e.uid] = {
-        key: [], keysecondary: [], comment: DISPATCH_NAME,
-        content: dispatchHeader() + String.fromCharCode(10) + text,
-        constant: true, vectorized: false, selective: true, selectiveLogic: 0,
-        addMemo: false, order: 100, position: 0, disable: false,
-        excludeRecursion: false, preventRecursion: false,
-        matchPersonaDescription: false, matchCharacterDescription: false,
-        matchCharacterPersonality: false, matchCharacterDepthPrompt: false,
-        matchScenario: false, matchCreatorNotes: false,
-        delayUntilRecursion: false, probability: 100, useProbability: true,
-        depth: 4, group: '', groupOverride: false, groupWeight: 100,
-        scanDepth: null, caseSensitive: null, matchWholeWords: null,
-        useGroupScoring: null, automationId: '', role: 0,
-        sticky: 0, cooldown: 0, delay: 0, uid: e.uid, displayIndex: e.idx,
-    };
-    return { changed: true, created: true, uid: e.uid };
-}
 // ── 操作日志（替代整本快照，体积小几十倍，且能精确撤销） ──
 function oplogOf(book) {
     const s = settings();
@@ -2149,6 +2245,8 @@ async function writePlan(book, plan) {
         const keys = (e.keys || []).map(clean).filter(Boolean);
         const hit = Object.entries(ent).find(([, v]) => String(v.comment) === comment);
         if (hit) {
+            // 旧的 keys 里如果有角色名而新生成的没有，补回去（不让条目失去名字触发）
+            if (nm && !keys.includes(nm) && (hit[1].key || []).some(function (p5) { return String(p5).indexOf(nm) >= 0; })) keys.unshift(nm);
             if (isHandEdited(book, comment, String(hit[1].content || ''))) edited.push(comment);
             log.updated.push({ uid: Object.keys(ent).find(function (k) { return ent[k] === hit[1]; }) || '', content: hit[1].content, key: hit[1].key });
             hit[1].content = clean(e.content); hit[1].key = keys; hit[1].constant = false; updated++;
@@ -2184,7 +2282,6 @@ async function writePlan(book, plan) {
         coreChanged++;
     }
 
-
     // 出场时机：写进常驻的行动路线，不单独成条
     const apSec = buildAppearSection(plan.appear, nm);
     const tlName = clean(settings().timelineEntry || '行动路线');
@@ -2215,7 +2312,7 @@ async function writePlan(book, plan) {
     }
     persist();
     if (added || updated || appearChanged) pushOplog(book, log);
-    return { added, updated, coreChanged, missing: [...new Set(missing)], dispatch: false, appear: appearChanged, edited, name: (plan.character || {}).name || '' };
+    return { added, updated, coreChanged, missing: [...new Set(missing)], appear: appearChanged, edited, name: (plan.character || {}).name || '' };
 }
 
 // ── 写入 ─────────────────────────────────────────
@@ -2229,11 +2326,11 @@ async function doWrite() {
     const prog = toastProgress('世界书条目更新中…');
     try {
         const r = await writePlan(book, state.plan);
-        prog.acDone('世界书更新完毕：新增 ' + r.added + ' 条' + (r.updated ? '，更新 ' + r.updated + ' 条' : '') + (r.dispatch ? '，调度表已更新' : ''));
+        prog.acDone('世界书更新完毕：新增 ' + r.added + ' 条' + (r.updated ? '，更新 ' + r.updated + ' 条' : ''));
         const lw = checkLengths(state.plan).filter(x => x.bad).map(x => x.name + ' ' + x.n + '字');
         const lengthWarn = lw.length ? '（字数偏离目标：' + lw.join('、') + '）' : '';
         if (r.edited && r.edited.length) toast('注意：' + r.edited.length + ' 条是你手改过的，已被覆盖：' + r.edited.join('、'), null, 12000);
-        setMsg('已写入「' + book + '」：新增 ' + r.added + ' · 更新 ' + r.updated + ' · 改核心 ' + r.coreChanged + (r.dispatch ? ' · 调度表已更新' : '') +
+        setMsg('已写入「' + book + '」：新增 ' + r.added + ' · 更新 ' + r.updated + ' · 改核心 ' + r.coreChanged +
             (r.missing.length ? '（跳过不存在的核心条目：' + r.missing.join('、') + '）' : '') + lengthWarn, 'ok', 'ac-msg2');
         if ($('ac-write')) $('ac-write').disabled = true;
         state.drafts = (state.drafts || []).filter(d => d.name !== r.name);
@@ -2353,9 +2450,9 @@ async function refreshOverview() {
         $('ac-cur').innerHTML =
             `<b>角色卡</b>　${esc(ch?.name || '(未选择)')}<br>
              <b>当前聊天</b>　${esc(ctx.getCurrentChatId ? ctx.getCurrentChatId() : '(无)')}<br>
-             <b>默认写入</b>　${esc(settings().targetBook || '(未选)')}`;
-        if (settings().targetBook) {
-            const d = await getBook(settings().targetBook);
+             <b>实际写入</b>　${esc(effectiveBook() || '(未选)')}`;
+        if (effectiveBook()) {
+            const d = await getBook(effectiveBook());
             const n = Object.keys(d.entries || {}).length;
             if ($('ac-v3')) $('ac-v3').textContent = n;
         }
@@ -2409,8 +2506,8 @@ function viewApi() {
         </div>
         <div class="ac-f">
           <label>额外请求头（可选）</label>
-          <input type="text" id="ac-headers" value="${esc(s.headers)}" placeholder="x-opencode-session: auto-char-ext" />
-          <div class="hint">一行一个，格式「名字: 值」。opencode 这类端点必须带 x-opencode-session。</div>
+          <input type="text" id="ac-headers" value="${esc(s.headers)}" placeholder="X-My-Header: value（没有就留空）" />
+          <div class="hint">一行一个，格式「名字: 值」。<b>opencode 这类端点必须带 x-opencode-session —— 插件会自动补，留空也行。</b></div>
         </div>
         <div class="ac-f" style="display:flex;gap:14px;">
           <div style="flex:1 1 0;">
@@ -2453,6 +2550,13 @@ function wireApi() {
     });
     bind('ac-url', 'apiUrl'); bind('ac-key', 'apiKey'); bind('ac-model', 'model');
     bind('ac-headers', 'headers');
+    $('ac-hdr-preview')?.addEventListener('click', function () {
+        const out = $('ac-hdr-out');
+        const txt = resolveHeaders();
+        if (out) out.innerHTML = txt
+            ? ('实际发送：<code>' + esc(txt.replace(/\n/g, ' | ')) + '</code>')
+            : '<span style="color:#ffd479">没填任何请求头（大多数端点没问题）</span>';
+    });
     bind('ac-max', 'maxTokens', true); bind('ac-temp', 'temperature', true);
 
     $('ac-transport')?.querySelectorAll('[data-t]').forEach(d => d.addEventListener('click', () => {
@@ -2473,7 +2577,7 @@ function wireApi() {
             const url = apiBase() + '/models';
             const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + String(s.apiKey || '').trim() } });
             const text = await res.text();
-            if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + text.slice(0, 120));
+            if (!res.ok) throw new Error(friendlyNetError('HTTP ' + res.status + ' ' + text.slice(0, 120)));
             let j; try { j = JSON.parse(text); } catch (e) { throw new Error('返回的不是 JSON'); }
             const arr = j.data || j.models || [];
             if (!arr.length) { box.innerHTML = '<div class="ac-empty">端点没有返回模型</div>'; return; }
@@ -2510,7 +2614,7 @@ function wireApi() {
 
 // ── 更新已有角色 ─────────────────────────────────
 async function viewUpdate() {
-    const book = settings().targetBook || state.books[0];
+    const book = effectiveBook() || state.books[0];
     const box = 'ac-upd';
     if (!book) return '<h2>更新角色</h2><div class="ac-card"><div class="ac-empty">先选一本世界书</div></div>';
 
@@ -2572,6 +2676,7 @@ function renderUpdateDiff() {
 function wireUpdate() {
     $('ac-upd-book')?.addEventListener('change', function (e) {
         settings().targetBook = e.target.value;
+        settings().followCharBook = false;
         state.updateChar = null; state.updateDiff = null;
         persist(); render();
     });
@@ -2605,7 +2710,7 @@ async function runUpdate() {
 
     try {
         const plan = await generatePlan({
-            book: settings().targetBook,
+            book: effectiveBook(),
             name: c.name,
             aliases: [],
             idea: settings().idea,
@@ -2620,7 +2725,7 @@ async function runUpdate() {
             const old = c.entries.find(function (x) { return x.comment === e.comment; });
             diff.push({
                 comment: e.comment,
-                edited: old ? isHandEdited(settings().targetBook, e.comment, old.content) : false,
+                edited: old ? isHandEdited(effectiveBook(), e.comment, old.content) : false,
                 old: old ? old.content : '',
                 neu: e.content,
                 keys: e.keys,
@@ -2641,7 +2746,7 @@ async function runUpdate() {
 }
 
 async function applyUpdate() {
-    const book = settings().targetBook;
+    const book = effectiveBook();
     const plan = state.updatePlan;
     if (!plan || !state.updateDiff) return;
     const msg = function (t, k) { const m = $('ac-upd-msg2'); if (m) { m.textContent = t; m.className = 'ac-msg' + (k ? ' ' + k : ''); } };
@@ -2666,6 +2771,752 @@ async function applyUpdate() {
         prog.acDone('应用失败：' + (e.message || e), 8000);
         msg('失败：' + (e.message || e), 'err');
     }
+}
+// 出场导演：每轮生成前算出该让谁出场，只注入一小段提示
+// ═══════════════════════════════════════════════════════════
+const DIR_KEY = 'AC-DIRECTOR';
+
+// 当前聊天的出场记录 { 名字: 最后出现楼层 }
+function dirLog() {
+    const s = settings();
+    s.dirLog = s.dirLog || {};
+    const k = chatKey();
+    return s.dirLog[k] || (s.dirLog[k] = {});
+}
+
+// ═══════════════════════════════════════════════════════════
+// LLM 扫世界书：让它判断哪些条目属于同一个人物
+// ═══════════════════════════════════════════════════════════
+const SCAN_PROMPT = [
+  '你在分析一本 SillyTavern 世界书的条目清单，任务是「把条目归并成人物」。',
+  '',
+  '【判断规则】',
+  '1. 同一个人分散在多条条目里（如「柳玉」「柳玉性格补充」「柳玉_胸部」）要合并成一个。',
+  '2. 只列真正的人物。世界观、故事基调、地图、行动路线、人物关系速览、数据表、提示词、',
+  '   包裹标记这类不是人物，不要列。',
+  '3. name 用最常用的称呼，2~8 个字，不要带修饰（不要「角色卡 柳玉」，只要「柳玉」）。',
+  '4. {{user}} 和主角本人不要列。',
+  '5. 拿不准是不是人物的，宁可不列。',
+  '',
+  '【输出】严格 JSON，不要代码块：',
+  '{"characters":[{"name":"柳玉","role":"英语老师兼班主任","entries":["柳玉","柳玉性格补充"]}]}',
+  '',
+  'entries 列出属于她的全部条目名（必须和清单里一模一样）。',
+].join('\n');
+
+// 用条目清单算个指纹，内容变了才需要重扫
+function scanHash(vals) {
+    const s2 = vals.map(function (e) { return String(e.comment || ''); }).sort().join('|');
+    let h = 5381;
+    for (let i = 0; i < s2.length; i++) h = ((h << 5) + h + s2.charCodeAt(i)) | 0;
+    return String(h) + ':' + String(s2.length);
+}
+
+// 调 LLM 扫一遍
+async function llmScanCharacters(force) {
+    const book = settings().targetBook;
+    if (!book) throw new Error('先选目标世界书');
+
+    const data = await getBook(book);
+    const vals = Object.values(data.entries || {});
+    const hash = scanHash(vals);
+
+    const s = settings();
+    s.dirScan = s.dirScan || {};
+    const cached = s.dirScan[book];
+    if (!force && cached && cached.hash === hash && (cached.chars || []).length) {
+        return { cached: true, chars: cached.chars };
+    }
+
+    // 精简清单：条目名 + 关键词（控制在约 8000 字以内）
+    const lines = [];
+    let total = 0;
+    for (const e of vals) {
+        const c = String(e.comment || '');
+        if (/^(TavernDB|ACU-)/i.test(c)) continue;
+        const ks = (e.key || []).slice(0, 4).join(',');
+        const line = '- ' + c + (ks ? ' | keys: ' + ks : '');
+        if (total + line.length > 8000) break;
+        lines.push(line);
+        total += line.length;
+    }
+    if (!lines.length) throw new Error('这本书没有可分析的条目');
+
+    const prompt = SCAN_PROMPT + String.fromCharCode(10, 10) + '【条目清单】' + String.fromCharCode(10) + lines.join(String.fromCharCode(10));
+
+    const raw = await callLLM(prompt);
+    const j = parseLoose(raw);
+    const chars = ((j && j.characters) || [])
+        .filter(function (x) { return x && x.name && String(x.name).trim().length <= 10; })
+        .map(function (x) {
+            return {
+                name: String(x.name).trim(),
+                role: String(x.role || '').trim(),
+                entries: Array.isArray(x.entries) ? x.entries.map(String) : [],
+            };
+        });
+
+    if (!chars.length) throw new Error('模型没认出任何人物');
+
+    s.dirScan[book] = { hash: hash, at: Date.now(), chars: chars };
+    persist();
+    return { cached: false, chars: chars, scanned: lines.length };
+}
+// 从世界书里抽出每个角色的场景词和出现方式（缓存用，异步）
+async function refreshDirCache() {
+    const book = settings().targetBook;
+    if (!book) { state.dirCache = null; return null; }
+    const data = await getBook(book);
+    const vals = Object.values(data.entries || {});
+    const tl = vals.find(function (e) { return String(e.comment) === clean(settings().timelineEntry || '行动路线'); });
+
+    const chars = [];
+    // 名字清洗：去掉【新】、（人设核心）、-猫妖 这类装饰
+    const cleanName = function (x) {
+        let s2 = String(x == null ? "" : x).replace(/【[^】]*】/g, "").replace(/\([^)]*\)/g, "").replace(/（[^）]*）/g, "");
+        s2 = s2.trim();
+        for (let k = 0; k < 5; k++) {
+            const s3 = s2.replace(/[\s_\-—·]+$/, "").replace(/[\s_\-—·]*(人设核心|人设|核心设定|核心|身体设定|身体|瑟瑟设定|瑟瑟|语料|可选|设定|档案|新)$/g, "").trim();
+            if (s3 === s2) break;
+            s2 = s3;
+        }
+        if (!s2 || s2.length > 8) return "";
+        if (/设定|档案|表格|规则|关系|其他|NPC|说明|用法|索引|介入|在场|时段|族|表$/.test(s2)) return "";
+        return s2;
+    };
+
+    // 可信度：3 = 角色卡 / 手动填的，2 = 行动路线，1 = 从条目名猜的
+    const namePri = new Map();
+    const addName = function (raw, pri) {
+        const nm0 = cleanName(raw);
+        if (!nm0) return;
+        if (/^(TavernDB|ACU-)/i.test(nm0)) return;
+        const cur = namePri.get(nm0);
+        if (cur === undefined || pri > cur) namePri.set(nm0, pri);
+    };
+
+    // 最高可信（5）：LLM 扫过的结果
+    const scanned = (settings().dirScan || {})[book];
+    const llmNames = new Map();
+    if (scanned && (scanned.chars || []).length) {
+        for (const c0 of scanned.chars) {
+            const nm5 = cleanName(c0.name);
+            if (!nm5) continue;
+            addName(nm5, 5);
+            llmNames.set(nm5, c0);
+        }
+    }
+
+    // 最高可信：从「人物关系速览」这类总表里读名字（比猜条目名可靠得多）
+    const ROSTER_NAMES = ['人物关系速览', '人物关系', '角色速览', '人物速览', '角色关系速览'];
+    for (const rn of ROSTER_NAMES) {
+        const re0 = vals.find(function (e) { return String(e.comment) === rn; });
+        if (!re0) continue;
+        const body0 = String(re0.content || '');
+        // 只取【关系网】之前的部分（那是成对关系，不是名单）
+        const cut0 = body0.indexOf('【关系网');
+        const roster = cut0 > 0 ? body0.slice(0, cut0) : body0;
+        for (const line of roster.split('\n')) {
+            const m0 = line.match(/^\s*([^\s:：<>\[\]{}]{2,10})\s*[:：]\s*\S/);
+            if (!m0) continue;
+            const nm0 = m0[1].trim();
+            if (!nm0 || /\{\{|^用户|主角|旁白/.test(nm0)) continue;
+            addName(nm0, 4);
+        }
+        console.log('[命运织机] 从「' + rn + '」读到 ' + namePri.size + ' 个名字');
+    }
+
+    for (const e of vals) {
+        const c = String(e.comment || "");
+        if (/^(TavernDB|ACU-)/i.test(c)) continue;
+        let m = c.match(/^(?:角色卡|身体配置|性癖档案|NSFW档案)\s*[:：]?\s*(.+)$/);
+        if (m) { addName(m[1], 3); continue; }
+        m = c.match(/^(.+?)[_\-—]?(?:行为落地指南|出场时机|介入机会)$/);
+        if (m) { addName(m[1], 2); continue; }
+        if (/人设|核心|设定/.test(c)) addName(c.split(/[_\-—（(【[]/)[0], 1);
+    }
+
+    if (tl) {
+        const body0 = String(tl.content || "");
+        for (const m0 of body0.matchAll(/(?:◇|【)\s*([^\s—】]+)/g)) addName(m0[1], 2);
+    }
+
+    for (const x of (settings().directorCharsExtra || [])) addName(x, 3);
+
+    // 去重：一个名字包含另一个时只留一个，优先可信度高、更长的
+    const sortedNames = [...namePri.entries()].sort(function (a, b) {
+        return (b[1] - a[1]) || (b[0].length - a[0].length);
+    });
+    const keptNames = [];
+    for (const pair of sortedNames) {
+        const nm9 = pair[0];
+        let dup = false;
+        for (const k of keptNames) {
+            if (k === nm9 || k.indexOf(nm9) >= 0 || nm9.indexOf(k) >= 0) { dup = true; break; }
+        }
+        if (!dup) keptNames.push(nm9);
+    }
+    const names = new Set(keptNames);
+    for (const n of names) {
+        let scenes = [];
+        let hint = '';
+        if (tl) {
+            const body = String(tl.content || '');
+            // 找她的段落
+            let at = body.indexOf('【' + n + ' 介入机会】');
+            let seg = '';
+            if (at >= 0) {
+                const nxt = body.indexOf('\n【', at + 1);
+                seg = body.slice(at, nxt >= 0 ? nxt : body.length);
+            } else {
+                at = body.indexOf('◇ ' + n);
+                if (at >= 0) {
+                    const nxt = body.indexOf('\n    ◇', at + 1);
+                    seg = body.slice(at, nxt >= 0 ? nxt : body.length);
+                }
+            }
+            if (seg) {
+                for (const line of seg.split('\n')) {
+                    const arrow = line.indexOf('→');
+                    if (arrow > 0) {
+                        const left = line.slice(0, arrow).replace(/^[\s\-·0-9.、]+/, '').trim();
+                        if (left) {
+                            for (const w of left.split(/[\/／、,，]/)) {
+                                let t2 = w.trim();
+                                // 去掉开头的动词/助词，只留名词性场景
+                                t2 = t2.replace(/^(进|去|到|在|开|翻|提|有人|和|他|被|遇|经过|路过|涉及|来到|回到)+/, '');
+                                t2 = t2.replace(/(的时候|时|了)$/, '');
+                                if (t2 && t2.length >= 2 && t2.length <= 6) scenes.push(t2);
+                            }
+                        }                        if (!hint) hint = line.slice(arrow + 1).trim();
+                    }
+                    const m2 = line.match(/不在场[:：]\s*(.+)$/);
+                    if (m2 && !hint) hint = line.trim();
+                }
+            }
+        }
+        let presenceText = '';
+        if (tl) {
+            const mm = String(tl.content || '').match(new RegExp('【' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' 介入机会】[\\s\\S]{0,600}?不在场[:：]\\s*(.+)'));
+            if (mm) presenceText = mm[1].trim();
+            if (!presenceText) {
+                const at2 = String(tl.content || '').indexOf('◇ ' + n);
+                if (at2 >= 0) {
+                    const seg2 = String(tl.content).slice(at2, at2 + 800);
+                    const m3 = seg2.match(/不在场[:：]\s*(.+)/);
+                    if (m3) presenceText = m3[1].trim();
+                }
+            }
+        }
+        // 收集她所有条目的关键词（用于确保注入的这个词真能触发扫描）
+        const myKeys = [];
+        const scanHit = llmNames.get(n);
+        const scanEntries = scanHit ? (scanHit.entries || []) : [];
+        for (const e of vals) {
+            const c3 = String(e.comment || '');
+            if (scanEntries.indexOf(c3) >= 0 || c3 === '角色卡 ' + n || c3 === '身体配置 ' + n || c3 === '性癖档案 ' + n || c3 === 'NSFW档案 ' + n || c3 === n + '_行为落地指南' || c3 === n + '_出场时机') {
+                for (const k3 of (e.key || [])) if (k3) myKeys.push(String(k3));
+            }
+        }
+        // 从她的角色卡里读关系：谁认识她、主角认不认识她
+        let relList = [];
+        let knownToUser = false;
+        const cardEnt = vals.find(function (e) { return String(e.comment) === '角色卡 ' + n; });
+        if (cardEnt) {
+            const ct = String(cardEnt.content || '');
+            const ru = ct.match(/与\{\{user\}\}的关系[:：]\s*(.+)/);
+            if (ru && !/陌生|不认识|路人|无关|毫无/.test(ru[1])) knownToUser = true;
+            const at4 = ct.indexOf('与其他角色的关系');
+            if (at4 >= 0) {
+                const seg4 = ct.slice(at4, at4 + 500);
+                for (const m4 of seg4.matchAll(/\n\s*-\s*([^:\n]{1,10})[:：]/g)) {
+                    const nm6 = m4[1].trim();
+                    if (nm6 && nm6.length <= 8) relList.push(nm6);
+                }
+            }
+        }
+        chars.push({ name: n, scenes: [...new Set(scenes)], hint: hint, presence: presenceText, keys: [...new Set(myKeys)], relations: [...new Set(relList)], knownToUser: knownToUser });
+    }
+
+    // 读数据库维护的「重要角色表」：谁在场、谁在哪（比数楼层准）
+    const dbCast = {};
+    let dbPlace = '';
+    try {
+        // 表头和数据可能分在不同条目里：先全局找一次表头，再按列号解析所有数据行
+        const dbEntries = vals.filter(function (e) { return /^TavernDB-ACU-CustomExport-重要角色表/.test(String(e.comment || '')); });
+        let iName = 1, iPlace = 6, iPresent = 7, foundHeader = false;
+        for (const e of dbEntries) {
+            for (const line of String(e.content || '').split('\n')) {
+                const cells = line.split('|').map(function (x) { return x.trim(); });
+                const a = cells.indexOf('姓名');
+                if (a > 0) {
+                    iName = a;
+                    const p = cells.findIndex(function (x) { return /所在地点|^地点|位置/.test(x); });
+                    const q = cells.findIndex(function (x) { return /在场状态|^在场/.test(x); });
+                    if (p > 0) iPlace = p;
+                    if (q > 0) iPresent = q;
+                    foundHeader = true;
+                    break;
+                }
+            }
+            if (foundHeader) break;
+        }
+        for (const e of dbEntries) {
+            for (const line of String(e.content || '').split('\n')) {
+                const cells = line.split('|').map(function (x) { return x.trim(); });
+                if (cells.length <= iName) continue;
+                const nm3 = cells[iName];
+                if (!nm3 || /^-+$/.test(nm3) || nm3 === '姓名') continue;
+                const place = cells[iPlace] || '';
+                const pres = cells[iPresent] || '';
+                // 索引表里只有名字的行不能覆盖已经解析到的详细行
+                const prev = dbCast[nm3];
+                if (prev && !place && !pres) continue;
+                let rels = [];
+                for (let ci = 2; ci < cells.length; ci++) {
+                    const v2 = cells[ci] || '';
+                    if (!/[;；]|:/.test(v2) || v2.length < 3) continue;
+                    for (const seg2 of v2.split(/[;；]/)) {
+                        const nm4 = segmentName(seg2);
+                        if (nm4) rels.push(nm4);
+                    }
+                }
+                dbCast[nm3] = {
+                    place: place || (prev ? prev.place : ''),
+                    present: pres ? (/在场|在/.test(pres) && !/不在|离场|离|absent/i.test(pres)) : (prev ? prev.present : false),
+                    hasPresent: !!pres || (prev ? prev.hasPresent : false),
+                    relations: rels.length ? rels : (prev && prev.relations ? prev.relations : []),
+                };
+            }
+        }
+        const rd = vals.find(function (e) { return String(e.comment) === 'TavernDB-ACU-ReadableDataTable'; });
+        if (rd) {
+            const rl = String(rd.content || '').split('\n');
+            let col = -1;
+            for (const line of rl) {
+                const cells = line.split('|').map(function (x) { return x.trim(); });
+                if (col < 0) {
+                    const idx = cells.indexOf('当前详细地点');
+                    if (idx > 0) col = idx;
+                    continue;
+                }
+                if (cells.length <= col) continue;
+                const v = cells[col];
+                if (!v || /^-+$/.test(v)) continue;
+                dbPlace = v;
+                break;
+            }
+        }
+    } catch (e) {
+        console.warn('[命运织机] 数据库表格解析失败（只用本地识别）', e);
+    }
+
+    // 数据库里有、我们这边没有的，也要能推荐（否则像秦丽这种人永远出不来）
+    const have = new Set(chars.map(function (c) { return c.name; }));
+    for (const n of Object.keys(dbCast)) {
+        if (have.has(n)) continue;
+        let dup = false;
+        for (const h of have) { if (h.indexOf(n) >= 0 || n.indexOf(h) >= 0) { dup = true; break; } }
+        if (dup) continue;
+        chars.push({ name: n, scenes: [], hint: '', dbOnly: true });
+    }
+
+    state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, at: Date.now() };
+    return state.dirCache;
+}
+
+// 首页文本数组
+function msgTexts() {
+    return (ctx.chat || []).map(function (m) { return String(m && m.mes || ''); });
+}
+
+// 算出这一轮该推荐谁（同步，只用缓存）
+function directorPick() {
+    const cache = state.dirCache;
+    if (!cache || !cache.chars || !cache.chars.length) return null;
+    const s = settings();
+    const texts = msgTexts();
+    const n = texts.length;
+    if (!n) return null;
+
+    const log = dirLog();
+    const dbCast = cache.dbCast || {};
+    const dbPlace = String(cache.dbPlace || '').trim();
+    // 数据库的表可能只写「夏凛」，而我们叫「魅魔妹妹夏凛」——按包含关系匹配
+    const dbOf = function (n) {
+        if (dbCast[n]) return dbCast[n];
+        for (const k of Object.keys(dbCast)) {
+            if (k && (n.indexOf(k) >= 0 || k.indexOf(n) >= 0)) return dbCast[k];
+        }
+        return null;
+    };
+    const recent = texts.slice(-3).join('\n');
+    const gapNeed = Math.max(1, Number(s.directorGap) || 8);
+
+    // 空闲检测：最近一楼是否在打斗/激烈冲突里
+    if (s.directorIdleOnly) {
+        const busy = /战斗|打斗|交手|争吵|怒吼|咆哮|危险|鲜血|受伤|追逐|逃亡|尖叫/;
+        if (busy.test(texts[n - 1] || '')) return { skip: true, why: '当前场景在激烈冲突里，不插人' };
+    }
+
+    // 每个人：上次出现楼层（从记录里取，没有就从正文里找最后一次提到）
+    const rows = cache.chars.map(function (c) {
+        let last = log[c.name] !== undefined ? log[c.name] : -1;
+        if (last < 0) {
+            for (let i = n - 1; i >= 0; i--) {
+                if (texts[i].indexOf(c.name) >= 0) { last = i; break; }
+            }
+        }
+        const gap = last < 0 ? n : (n - 1 - last);
+        const sceneHit = (c.scenes || []).filter(function (w) { return w && recent.indexOf(w) >= 0; });
+        return { name: c.name, hint: c.hint, gap: gap, last: last, hit: sceneHit, scenes: c.scenes || [] };
+    });
+
+    // 数据库说他在场的，直接从候选里剔除（他已经在这个画面里了）
+    const inScene = rows.filter(function (r) { const d = dbOf(r.name); return d && d.present; }).map(function (r) { return r.name; });
+    const eligible0 = rows.filter(function (r) { return !inScene.includes(r.name); });
+    const eligible = eligible0.filter(function (r) { return r.gap >= gapNeed; });
+    // 严格按间隔门槛：没到门槛的人一律不进候选（否则刚出现过的人会被反复推荐）
+    const pool = eligible;
+    if (!pool.length) return { skip: true, why: '所有人都在间隔门槛内，这一轮不推荐', all: rows };
+
+    // 场景命中优先；命中里挑间隔最大的
+    const matched = pool.filter(function (r) { return r.hit.length > 0; });
+    const chance = s.directorAllowRandom ? Math.max(0, Math.min(100, Number(s.directorChance) || 0)) : 0;
+    let pick = null;
+
+    if (matched.length) {
+        // 场景真的有对上的人：从命中里挑间隔最大的
+        pick = matched.sort(function (a, b) { return b.hit.length - a.hit.length || b.gap - a.gap; })[0];
+    } else if (chance > 0 && Math.random() * 100 < chance) {
+        // 用户明确开了「随机偶遇」才硬插，并且只从最久没出场的人里挑
+        const far = function (n) { const d = dbOf(n); return !!(d && d.place && dbPlace && d.place !== dbPlace); };
+        const near = pool.filter(function (r) { return !far(r.name); });
+        const base = near.length ? near : pool;
+        const maxGap = Math.max.apply(null, base.map(function (r) { return r.gap; }));
+        const top = base.filter(function (r) { return r.gap >= maxGap - 1; });
+        pick = top[Math.floor(Math.random() * top.length)];
+    } else {
+        // 没有场景命中：不让她出场，但可以让世界记得她（轻提）
+        const mildNeed = gapNeed * 2;
+        // 只对「已经出场过、后来冷了」的人轻提。
+        // 从没出场过的人不能被轻提 —— 主角根本不认识她（否则一条短信、一件外套都会很突兀）
+        const knownToStory = function (r) {
+            if (r.last >= 0) return true;              // 本聊天里被提到过
+            const cc = (cache.chars || []).find(function (x) { return x.name === r.name; });
+            if (cc && cc.knownToUser) return true;     // 角色卡里写了她和主角有关系
+            const d = dbOf(r.name);
+            return !!(d && (d.place || d.relations && d.relations.length));   // 数据库记过她 = 剧情里出现过
+        };
+        const cold = pool.filter(function (r) {
+            return r.gap >= mildNeed && knownToStory(r) && ((r.scenes || []).length || r.hint);
+        });
+        if (cold.length) {
+            const maxG = Math.max.apply(null, cold.map(function (r) { return r.gap; }));
+            const top = cold.filter(function (r) { return r.gap >= maxG - 1; });
+            return { mild: true, pick: top[Math.floor(Math.random() * top.length)], all: rows };
+        }
+        return { skip: true, why: '没有人的场景对得上，也没有「已经出场过但久未出现」的人，这一轮不推荐', all: rows };
+    }
+
+    if (!pick) return { skip: true, why: '没有可推荐的人', all: rows };
+    return { pick: pick, all: rows, skipped: rows.length - pool.length };
+}
+
+// 生成注入文本
+function directorText(res) {
+    if (!res || !res.pick) return '';
+    const p = res.pick;
+    const L = [];
+    L.push('[出场提示] ' + p.name + '（' + p.gap + ' 楼未出场）' + (p.trig && p.trig !== p.name ? '　关键词：' + p.trig : ''));
+    if (p.hit && p.hit.length) L.push('当前场景提到了：' + p.hit.join('、') + '，适合让她介入。');
+    else if ((p.scenes || []).length) L.push('她通常在：' + p.scenes.slice(0, 4).join('、') + '（场景对得上才用）。');
+    if (p.hint) L.push('她的出场方式：' + p.hint.slice(0, 90));
+    L.push('如果她此刻出现会显得突兀，就完全忽略本提示 —— 宁可这一轮没人出场。');
+    return L.join(String.fromCharCode(10));
+}
+// 一条「不在场」提示，是否需要有人在场才能成立
+// 需要：白练华说「…」、文博抱怨「…」、苏雅提起「…」
+// 不需要：冰箱里的餐盒、桌上一碗汤、门口的便签、手机上的一条消息
+function segmentName(seg) {
+    const s2 = String(seg || '').trim();
+    const i2 = s2.indexOf(':');
+    const i3 = s2.indexOf('：');
+    const cut = i2 >= 0 ? i2 : i3;
+    const nm = (cut > 0 ? s2.slice(0, cut) : s2).trim();
+    return (nm && nm.length <= 8 && !/^[-|\s]*$/.test(nm)) ? nm : '';
+}
+
+function presenceNeedsSpeaker(s) {
+    const str = String(s || '');
+    if (/短信|消息|便签|字条|电话|微信|群|快递|留言|来路不明/.test(str)) return null;   // 通讯/物件类
+    const m = str.match(/^([^\s「」『』]{2,7}?)(说|提到|提起|转述|抱怨|问|告诉|聊|一句)[「"『]/);
+    return m ? m[1] : null;   // 返回说话人，需要他在场
+}
+// 轻提：不让她出场，只让世界记得她
+function directorMildText(p) {
+    const L = [];
+    // 名字放在开头括号里：既能被世界书扫描看到，又不打断阅读
+    L.push('[存在感提示] ' + p.name + '（' + p.gap + ' 楼未出场）' + (p.trig && p.trig !== p.name ? '　关键词：' + p.trig : ''));
+    L.push('这一场不必让她出场。');
+    const sp = p.presenceSpeak || [];
+    const tr = p.presenceTrace || [];
+    if (sp.length) {
+        L.push('如果顺手，可以让在场的' + sp[0].replace(/(说|提到|提起|转述|抱怨|问|告诉|聊|一句)[「"『].*$/, '') + '自然地提一句她 —— 一句带过，别像在念设定。');
+    }
+    if (tr.length) {
+        L.push('（她留下的痕迹：' + tr.slice(0, 3).join('；') + '）');
+    }
+    if (!sp.length && !tr.length) L.push('（一件属于她的东西，或一条她发来的消息）');
+    L.push('不要让不认识她的人提到她，也不要让她本人出现。');
+    L.push('如果连痕迹都不好安排，就完全忽略本提示。');
+    return L.join(String.fromCharCode(10));
+}
+// 每轮生成前调用（同步）
+function runDirector() {
+    try {
+        const s = settings();
+        if (!s.director) { clearDirector(); return; }
+        if (!ctx.setExtensionPrompt) return;
+
+        // 注入的这个词必须真的在某个条目的 keys 里，否则扫不到
+        const triggerOf = function (nm5) {
+            const c5 = ((state.dirCache && state.dirCache.chars) || []).find(function (x) { return x.name === nm5; });
+            const ks = (c5 && c5.keys) || [];
+            if (!ks.length) return nm5;
+            if (ks.indexOf(nm5) >= 0) return nm5;
+            for (const k5 of ks) { if (nm5.indexOf(k5) >= 0 || k5.indexOf(nm5) >= 0) return k5; }
+            return ks[0];
+        };
+
+        const pos = s.directorPos === "before" ? 2 : (s.directorPos === "in_prompt" ? 0 : 1);
+        const depth = Math.max(0, Number(s.directorDepth) || 4);
+
+        // 一档：模型在检测时顺带给的判断（同一次请求，不额外花钱）
+        const sg = state.dirSuggestion;
+        const fresh = sg && sg.name && (Date.now() - (sg.at || 0) < 15 * 60 * 1000);
+        if (fresh) {
+            const c = ((state.dirCache && state.dirCache.chars) || []).find(function (x) { return x.name === sg.name; });
+            sg.trig = triggerOf(sg.name);
+            const text2 = [
+                "[出场提示] " + sg.name + "（这一场适合出现）" + (sg.trig && sg.trig !== sg.name ? "　关键词：" + sg.trig : ""),
+                sg.why ? ("理由：" + sg.why) : "",
+                (c && (c.scenes || []).length) ? ("她通常在：" + c.scenes.slice(0, 4).join("、")) : "",
+                (c && c.hint) ? ("她的出场方式：" + String(c.hint).slice(0, 90)) : "",
+                "如果她此刻出现会显得突兀，就完全忽略本提示 —— 宁可这一轮没人出场。",
+            ].filter(Boolean).join(String.fromCharCode(10));
+            ctx.setExtensionPrompt(DIR_KEY, text2, pos, depth, true, 0);
+            state.dirLast = { at: Date.now(), name: sg.name, text: text2, gap: 0, by: "llm" };
+            state.dirSuggestion = null;
+            console.log("[命运织机] 导演（模型判断）：" + sg.name);
+            toastDirector('llm', sg.name, 0);
+            return;
+        }
+
+        // 二档 / 三档：本地计算
+        const res = directorPick();
+        if (!res) { clearDirector(); return; }
+
+        // 轻提：不让她出场，只让世界记得她
+        if (res.mild && res.pick) {
+            const cm = ((state.dirCache && state.dirCache.chars) || []).find(function (x) { return x.name === res.pick.name; });
+            res.pick.presenceText = (cm && cm.presence) ? cm.presence : "";
+            res.pick.trig = triggerOf(res.pick.name);
+            const mt = directorMildText(res.pick);
+            ctx.setExtensionPrompt(DIR_KEY, mt, pos, depth, true, 0);
+            state.dirLast = { at: Date.now(), name: res.pick.name, text: mt, gap: res.pick.gap, by: "mild" };
+            console.log("[命运织机] 导演轻提：" + res.pick.name + "（" + res.pick.gap + " 楼未出场，只提及不出场）");
+            toastDirector('mild', res.pick.name, res.pick.gap);
+            return;
+        }
+
+        if (res.skip || !res.pick) { clearDirector(); return; }
+
+        // 正常出场：场景词命中
+        res.pick.trig = triggerOf(res.pick.name);
+        const text = directorText(res);
+        if (!text) { clearDirector(); return; }
+        ctx.setExtensionPrompt(DIR_KEY, text, pos, depth, true, 0);
+        state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap, by: "script" };
+        console.log("[命运织机] 导演：推荐 " + res.pick.name + "（" + res.pick.gap + " 楼未出场，场景词命中）");
+        toastDirector('script', res.pick.name, res.pick.gap);
+    } catch (err) {
+        console.warn("[命运织机] 出场导演失败", err);
+    }
+}
+
+function clearDirector() {
+    try {
+        if (ctx.setExtensionPrompt) ctx.setExtensionPrompt(DIR_KEY, '', 1, 4, false, 0);
+    } catch (e) { /* ignore */ }
+}
+
+// ── 出场导演页 ────────────────────────────────────
+function viewDirector() {
+    const s = settings();
+    const cache = state.dirCache;
+    const rows = (cache && cache.chars) || [];
+    const last = state.dirLast;
+
+    let h = '<h2>出场导演</h2>';
+    h += '<div class="ac-card"><div class="h">说明</div>' +
+        '<div class="hint" style="line-height:1.9">开启后，每次生成前会算出「这一轮该让谁出场」，只往提示词里插一小段（约 100 字）。<br>' +
+        '这一小段是<b>参与世界书扫描</b>的（scan=true）。里面带着她的名字，' +
+        '所以会顺手把她那几条绿灯条目一起点着 —— 人设由世界书自己带进来，导演不重复写。<br>' +
+        '你不需要记关键词，也不用手动触发。</div></div>';
+
+    h += '<div class="ac-card"><div class="h">开关</div>' +
+        '<div class="ac-f"><div class="ac-seg" id="ac-dir-on" style="width:260px">' +
+        '<div data-v="1" class="' + (s.director ? 'on' : '') + '">开启</div>' +
+        '<div data-v="0" class="' + (!s.director ? 'on' : '') + '">关闭</div>' +
+        '</div></div></div>';
+
+    h += '<div class="ac-card"><div class="h">参数</div>';
+    h += '<div class="ac-grid2">';
+    h += '<div class="ac-f"><label>建议间隔（楼）</label><input type="number" id="ac-dir-gap" value="' + (s.directorGap || 8) + '" min="1" max="200" />' +
+        '<div class="hint">一个人至少这么多楼没出现，才会被推荐。</div></div>';
+    h += '<div class="ac-f"><label>允许随机偶遇</label>' +
+        '<label class="ac-sw"><input type="checkbox" id="ac-dir-rand"' + (s.directorAllowRandom ? ' checked' : '') + ' /><span></span></label>' +
+        '<div class="hint"><b>默认关。</b>关着时只在场景词命中时才推荐，绝不会有「隔很多楼突然出现」。</div></div>';
+    h += '<div class="ac-f"' + (s.directorAllowRandom ? '' : ' style="opacity:.45;pointer-events:none"') + '><label>随机概率（%）</label>' +
+        '<input type="number" id="ac-dir-chance" value="' + (s.directorChance || 0) + '" min="1" max="100" />' +
+        '<div class="hint">开了随机偶遇后，这个百分比的场景不匹配时也会硬插一个最久没出场的人。会显得突兀。</div></div>';
+    h += '<div class="ac-f"><label>深度</label><input type="number" id="ac-dir-depth" value="' + (s.directorDepth || 4) + '" min="0" max="50" />' +
+        '<div class="hint">只在「对话里」时生效。数字越小越靠后。</div></div>';
+    h += '<div class="ac-f"><label>注入位置</label><select id="ac-dir-pos">' +
+        '<option value="in_chat"' + (s.directorPos === 'in_chat' ? ' selected' : '') + '>对话里（按深度插入）</option>' +
+        '<option value="in_prompt"' + (s.directorPos === 'in_prompt' ? ' selected' : '') + '>提示词开头</option>' +
+        '<option value="before"' + (s.directorPos === 'before' ? ' selected' : '') + '>主提示词之前</option>' +
+        '</select></div>';
+    h += '</div>';
+    h += '<div class="ac-f" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:660px">' +
+        '<label style="margin:0">只在空闲场景出手</label>' +
+        '<label class="ac-sw"><input type="checkbox" id="ac-dir-idle"' + (s.directorIdleOnly ? ' checked' : '') + ' /><span></span></label>' +
+        '</div>';
+    h += '<div class="hint" style="margin-top:4px">最近一楼在打斗、争吵、逃亡这类激烈情节时，不插人。</div>';
+    h += '<div class="ac-f" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:660px;margin-top:8px">' +
+        '<label style="margin:0">动手时弹提示</label>' +
+        '<label class="ac-sw"><input type="checkbox" id="ac-dir-notify"' + (s.directorNotify ? ' checked' : '') + ' /><span></span></label>' +
+        '</div>';
+    h += '<div class="hint" style="margin-top:4px">右上角会弹一条「导演 · 出场 / 轻提」，告诉你这一轮它做了什么。</div>';
+    h += '</div>';
+    h += '<div class="ac-card"><div class="h">素材 <span class="i">' + rows.length + ' 个角色</span></div>' +
+        '<div class="ac-f"><label>从哪本书读</label><select id="ac-dir-book">' +
+        state.books.map(function (b) { return '<option value="' + esc(b) + '"' + (b === s.targetBook ? ' selected' : '') + '>' + esc(b) + '</option>'; }).join('') +
+        '</select><div class="hint">会从这里解析「行动路线」的角色和场景词。</div></div>' +
+        (function () {
+            const c = state.dirCache;
+            if (!c || !c.dbCast) return '';
+            const names = Object.keys(c.dbCast);
+            if (!names.length) return '<div class="hint" style="margin-top:10px">这本书里没有数据库表格（不影响使用，只是少了「在场状态」判断）。</div>';
+            const present = names.filter(function (n) { return c.dbCast[n].present; });
+            return '<div class="hint" style="margin-top:10px;line-height:1.8">' +
+                '<b>数据库表格</b>　当前地点：' + esc(c.dbPlace || '未记录') + '<br>' +
+                '在角色表里 ' + names.length + ' 人，其中在场 ' + present.length + ' 人' +
+                (present.length ? '（' + esc(present.join('、')) + '）' : '') + '<br>' +
+                '在场的人不会被推荐出场，在别处的人会降低优先级。</div>';
+        })() +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+        '<button class="ac-btn" id="ac-dir-refresh">重新读取</button>' +
+        '<button class="ac-btn pri" id="ac-dir-scan">LLM 扫描角色</button>' +
+        '</div>' +
+        (function () {
+            const sc0 = (s.dirScan || {})[s.targetBook];
+            if (!sc0) return '<div class="hint" style="margin-top:8px">还没用 LLM 扫过。扫描会把条目名和关键词发给模型（约 1 次请求），' +
+                '让它判断哪些条目属于同一个人物 —— 命名再乱也能认出来。<b>世界书内容变了需要重扫。</b></div>';
+            return '<div class="hint" style="margin-top:8px">LLM 上次扫描：' + esc(new Date(sc0.at).toLocaleString()) +
+                '　认出 ' + (sc0.chars || []).length + ' 个角色</div>';
+        })() +
+        (rows.length ? '<div style="margin-top:12px;font-size:13px;color:#9fb0b0">' +
+            rows.slice(0, 20).map(function (c) {
+                return '<div>' + esc(c.name) + '　<span style="color:#6f8080">' + (c.scenes || []).slice(0, 6).join('、') + '</span></div>';
+            }).join('') + '</div>' : '') +
+        '</div>';
+
+    h += '<div class="ac-card"><div class="h">这一轮的预览</div>' +
+        '<button class="ac-btn pri" id="ac-dir-preview">预览</button>' +
+        '<div class="ac-msg" id="ac-dir-msg"></div>' +
+        (last ? '<div class="hint" style="margin-top:10px">来源：' + (last.by === 'llm' ? '<b style="color:#8fd9b6">模型判断</b>（检测时顺带挑的）' : last.by === 'mild' ? '<b style="color:#7dd3fc">轻提</b>（不出场，只提及）' : '<b style="color:#ffd479">脚本</b>（场景词命中）') + '</div>' +
+            '<div class="ac-view" style="margin-top:8px;max-height:220px">' + esc(last.text) + '</div>' : '') +
+        '</div>';
+
+    return h;
+}
+
+function wireDirector() {
+    document.querySelectorAll('#ac-dir-on > div').forEach(function (d) {
+        d.addEventListener('click', function () {
+            settings().director = d.dataset.v === '1';
+            persist();
+            if (!settings().director) clearDirector();
+            render();
+        });
+    });
+    const bind = function (id, key, num) {
+        const el = $(id);
+        if (!el) return;
+        el.addEventListener('change', function () {
+            settings()[key] = num ? Number(el.value) : el.value;
+            persist();
+        });
+    };
+    const bk = $('ac-dir-book');
+    if (bk) bk.addEventListener('change', function () {
+        settings().targetBook = bk.value;
+        state.dirCache = null;
+        persist();
+        refreshDirCache().then(function () { render(); }).catch(function () {});
+    });
+    bind('ac-dir-gap', 'directorGap', true);
+    const rnd = $('ac-dir-rand');
+    if (rnd) rnd.addEventListener('change', function () { settings().directorAllowRandom = rnd.checked; persist(); render(); });
+    bind('ac-dir-chance', 'directorChance', true);
+    bind('ac-dir-depth', 'directorDepth', true);
+    bind('ac-dir-pos', 'directorPos', false);
+    const ntf = $('ac-dir-notify');
+    if (ntf) ntf.addEventListener('change', function () { settings().directorNotify = ntf.checked; persist(); });
+    const idle = $('ac-dir-idle');
+    if (idle) idle.addEventListener('change', function () { settings().directorIdleOnly = idle.checked; persist(); });
+
+    const btnScan = $('ac-dir-scan');
+    if (btnScan) btnScan.addEventListener('click', async function () {
+        btnScan.disabled = true;
+        const prog = toastProgress('正在让模型扫世界书…可能要十几秒');
+        try {
+            const r = await llmScanCharacters(true);
+            prog.acDone('扫描完成：认出 ' + r.chars.length + ' 个角色');
+            await refreshDirCache();
+        } catch (e) {
+            prog.acDone('扫描失败：' + (e.message || e), 8000);
+        }
+        btnScan.disabled = false;
+        render();
+    });
+
+    const rf = $('ac-dir-refresh');
+    if (rf) rf.addEventListener('click', async function () {
+        rf.disabled = true;
+        const prog = toastProgress('正在读取世界书…');
+        try {
+            await refreshDirCache();
+            prog.acDone('读取完成：' + ((state.dirCache && state.dirCache.chars.length) || 0) + ' 个角色');
+        } catch (e) { prog.acDone('读取失败：' + (e.message || e), 8000); }
+        rf.disabled = false;
+        render();
+    });
+
+    const pv = $('ac-dir-preview');
+    if (pv) pv.addEventListener('click', function () {
+        const m = $('ac-dir-msg');
+        const res = directorPick();
+        if (!res) { if (m) { m.className = 'ac-msg err'; m.textContent = '还没有素材，先点「重新读取」'; } return; }
+        if (res.skip) { if (m) { m.className = 'ac-msg err'; m.textContent = res.why; } return; }
+        if (!res.pick) { if (m) { m.className = 'ac-msg err'; m.textContent = '没有可推荐的人'; } return; }
+        const text = directorText(res);
+        state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap };
+        if (m) { m.className = 'ac-msg ok'; m.textContent = '这一轮会推荐：' + res.pick.name; }
+        render();
+    });
 }
 // ── 备份 / 操作记录 ──────────────────────────────
 function viewBackups() {
@@ -2722,38 +3573,6 @@ function wireBackups() {
         render();
     });
 }
-// ── 说明 ─────────────────────────────────────────
-function viewAbout() {
-    return `<h2>模板与规则</h2>
-      <div class="ac-card"><div class="h">生成的三个条目</div>
-        <div class="ac-view" style="max-height:none">角色卡 &lt;名&gt;
-  YAML，包在 &lt;character&gt; 里
-  基调 / 核心身份 / 背景 / 外貌 / 语言风格 / 性格
-
-NSFW档案 &lt;名&gt;
-  YAML，包在 &lt;NSFW档案&gt; 里
-  特质 / 身体反应 / 敏感点 / 会说的话 / 不会说的话 / 底线
-
-&lt;名&gt;_行为落地指南
-  纯文本，行为路线1~N
-  每条含 触发条件 / 动作表现 / 重点细节</div>
-      </div>
-      <div class="ac-card"><div class="h">六条核心会同步更新</div>
-        <div class="ac-pos">${CORE_NAMES.map(n => '· ' + n).join('<br>')}</div>
-        <div class="hint" style="margin-top:10px">目标世界书里没有这几个条目名时，对应的更新会被跳过并提示。</div>
-      </div>
-      <div class="ac-card"><div class="h">铁律</div>
-        <div class="ac-pos">
-          ① 种族不改，素材是什么种族就是什么<br>
-          ② 设定照搬，只补居住地/关系/职业<br>
-          ③ 世界以主卡为准，无法融合的丢弃<br>
-          ④ 素材没写的不编造，宁可留空<br>
-          ⑤ 关键词一项一个词，不含空格<br>
-          ⑥ 三条全部关键词触发，不设常驻
-        </div>
-      </div>`;
-}
-
 // ── 挂载 ─────────────────────────────────────────
 jQuery(async () => {
     try { state.books = await listBooks(); } catch (e) { console.warn('[命运织机] 读列表失败', e); }
@@ -2772,11 +3591,15 @@ jQuery(async () => {
         const evs = ctx.eventSource, evt = ctx.event_types;
         if (evs && evt && evt.MESSAGE_RECEIVED) {
             evs.on(evt.MESSAGE_RECEIVED, () => scheduleAuto());
+            if (evt.GENERATION_STARTED) {
+                evs.on(evt.GENERATION_STARTED, () => runDirector());
+                console.log('[命运织机] 已挂载出场导演');
+            }
             console.log('[命运织机] 已挂载对话结束检测');
         }
     } catch (e) { console.warn('[命运织机] 事件挂载失败', e); }
 
     ensurePanel();
-    console.log('[命运织机] v0.5.0 已加载 · 世界书 ' + state.books.length + ' 本');
+    console.log('[命运织机] v0.6.0 已加载 · 世界书 ' + state.books.length + ' 本');
 });
 })();

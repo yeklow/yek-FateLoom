@@ -68,7 +68,7 @@ https://github.com/yeklow/yek-FateLoom
 
 如果装了 [JS-Slash-Runner](https://github.com/N0VI028/JS-Slash-Runner)，把 `yek-FateLoom.script.js` 的内容粘进脚本库即可，不用重启。
 
-> 单文件版目前停留在 0.5.0，比扩展版滞后。功能以扩展版为准。
+> 单文件版由 `build-script.mjs` 从 `index.js` + `style.css` 自动生成，与扩展版同步。`r`n> 改完源码跑一次 `node build-script.mjs` 即可。
 
 ## 生成的条目
 

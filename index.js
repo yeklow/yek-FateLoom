@@ -2470,8 +2470,8 @@ function viewApi() {
         </div>
         <div class="ac-f">
           <label>额外请求头（可选）</label>
-          <input type="text" id="ac-headers" value="${esc(s.headers)}" placeholder="x-opencode-session: auto-char-ext" />
-          <div class="hint">一行一个，格式「名字: 值」。opencode 这类端点必须带 x-opencode-session。</div>
+          <input type="text" id="ac-headers" value="${esc(s.headers)}" placeholder="X-My-Header: value（没有就留空）" />
+          <div class="hint">一行一个，格式「名字: 值」。<b>opencode 这类端点必须带 x-opencode-session —— 插件会自动补，留空也行。</b></div>
         </div>
         <div class="ac-f" style="display:flex;gap:14px;">
           <div style="flex:1 1 0;">
@@ -2514,6 +2514,13 @@ function wireApi() {
     });
     bind('ac-url', 'apiUrl'); bind('ac-key', 'apiKey'); bind('ac-model', 'model');
     bind('ac-headers', 'headers');
+    $('ac-hdr-preview')?.addEventListener('click', function () {
+        const out = $('ac-hdr-out');
+        const txt = resolveHeaders();
+        if (out) out.innerHTML = txt
+            ? ('实际发送：<code>' + esc(txt.replace(/\n/g, ' | ')) + '</code>')
+            : '<span style="color:#ffd479">没填任何请求头（大多数端点没问题）</span>';
+    });
     bind('ac-max', 'maxTokens', true); bind('ac-temp', 'temperature', true);
 
     $('ac-transport')?.querySelectorAll('[data-t]').forEach(d => d.addEventListener('click', () => {
