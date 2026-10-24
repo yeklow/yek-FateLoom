@@ -3708,9 +3708,12 @@ function directorPick() {
     // 策略一：指定角色优先 —— 你选的人，只要够久没出场、场景又不在激烈冲突里，就让她出
     if (s.directorMode === 'pin' && s.directorPin) {
         const pinName = String(s.directorPin);
-        const pinned = pool.find(function (r) { return r.name === pinName || r.name.indexOf(pinName) >= 0 || pinName.indexOf(r.name) >= 0; });
+        // 手动点过「立刻让她出场」的话，跳过节流门槛（仍然排除已经在这个画面里的人）
+        const force = (state.forceNext && state.forceNext === pinName) ? rows.filter(function (r) { return !inScene.includes(r.name); }) : pool;
+        const pinned = force.find(function (r) { return r.name === pinName || r.name.indexOf(pinName) >= 0 || pinName.indexOf(r.name) >= 0; });
         if (pinned) {
             pinned.strength = 'strong';   // 用户明确指定的人，一律按「请安排」
+            if (state.forceNext === pinName) { state.forceNext = ''; pinned.forced = true; }
             return { pick: pinned, all: rows, byMode: 'pin' };
         }
     }
@@ -3808,6 +3811,7 @@ function directorText(res) {
     } else if (p.strength === 'strong') {
         L.push('这一轮请让她出现在这一段里。她怎么出场、先做了什么、说了什么，按她的人设和你这一段的行文自然写，不要照搬任何固定句式。');
         L.push('除非和正在发生的事直接矛盾（比如人已经离开这个地点），否则不要跳过。');
+        L.push('本轮回复里必须出现「' + p.name + '」的动作或对话，不能只在旁白里提一下名字。');
     } else {
         L.push('她可以出现在这一段，也可以不出现 —— 你觉得自然就让她进，觉得突兀就忽略本提示。');
         L.push('如果让她出现，怎么进场由你决定。');
@@ -3885,6 +3889,7 @@ function runDirector() {
                 "除非和正在发生的事直接矛盾，否则不要跳过。",
             ].filter(Boolean).join(String.fromCharCode(10));
             ctx.setExtensionPrompt(DIR_KEY, text2, pos, depth, true, 0);
+            try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
             state.dirLast = { at: Date.now(), name: sg.name, text: text2, gap: 0, by: "llm" };
     try { renderDirStatus(); } catch (e) {}
             state.dirSuggestion = null;
@@ -3904,6 +3909,7 @@ function runDirector() {
             res.pick.trig = triggerOf(res.pick.name);
             const mt = directorMildText(res.pick);
             ctx.setExtensionPrompt(DIR_KEY, mt, pos, depth, true, 0);
+            try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
             state.dirLast = { at: Date.now(), name: res.pick.name, text: mt, gap: res.pick.gap, by: "mild" };
     try { renderDirStatus(); } catch (e) {}
             console.log("[命运织机] 导演轻提：" + res.pick.name + "（" + res.pick.gap + " 楼未出场，只提及不出场）");
@@ -3918,6 +3924,7 @@ function runDirector() {
         const text = directorText(res);
         if (!text) { clearDirector(); return; }
         ctx.setExtensionPrompt(DIR_KEY, text, pos, depth, true, 0);
+            try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
         state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap, by: "script" };
     try { renderDirStatus(); } catch (e) {}
         console.log("[命运织机] 导演：推荐 " + res.pick.name + "（" + res.pick.gap + " 楼未出场，场景词命中）");
@@ -4464,11 +4471,13 @@ function watchCharacter() {
 // 导演状态显示：这一轮安排了谁
 function dirStatusHtml() {
     const last = state.dirLast;
+    const inj = (state.dirInject || [])[0];
+    const injLine = inj ? ('<div style="font-size:11px;color:#6f8080;margin-top:4px">上次注入 ' + new Date(inj.at).toLocaleTimeString() + ' · ' + inj.len + ' 字' + (inj.forced ? ' · 强制' : '') + '</div>') : '';
     const pinNow = (settings().directorMode === 'pin' && settings().directorPin) ? String(settings().directorPin) : '';
     if (pinNow) return '<div style="padding:10px 12px;line-height:1.7">' +
         '<div><b style="color:#ffd479">' + esc(pinNow) + '</b>' +
         '<span style="font-size:11px;color:#6f8080;margin-left:6px">已指定，等合适时机</span></div>' +
-        '<div style="font-size:11px;color:#6f8080">她够久没出场、当前场景不激烈时就会推她出场</div></div>';
+        '<div style="font-size:11px;color:#6f8080">她够久没出场、当前场景不激烈时就会推她出场</div>' + injLine + '</div>';
     if (!last) {
         return '<div class="mini-e" style="padding:10px 12px">这一轮导演还没出手。<br>点「预测」看看它打算怎么安排。</div>';
     }
@@ -4588,9 +4597,17 @@ async function renderMini(needCache) {
             '<input type="checkbox" data-mpick="' + esc(c.name) + '"' + chk + ' />' +
             '<span class="mini-n" style="' + (pinned ? 'color:#ffd479' : '') + '">' + esc(c.name) + (pinned ? ' ★' : '') + '</span>' +
             '<button class="mini-pin" data-pin="' + esc(c.name) + '" title="' + (pinned ? '取消指定' : '指定她优先出场') + '">' + (pinned ? '取消' : '指定') + '</button>' +
+            (pinned ? '<button class="mini-pin" data-force="' + esc(c.name) + '" title="跳过间隔限制，这一轮就让她出场" style="background:#8fd9b6;color:#10201c">立刻</button>' : '') +
             '<span class="mini-t">' + esc(tag) + '</span></div>';
             '<span class="mini-t">' + esc(tag) + '</span></label>';
     }).join("");
+    list.querySelectorAll('[data-force]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            state.forceNext = btn.dataset.force;
+            toast('下一轮会强制让「' + btn.dataset.force + '」出场（跳过间隔限制）', null, 5000);
+        });
+    });
     list.querySelectorAll('[data-pin]').forEach(function (btn) {
         btn.addEventListener('click', async function (e) {
             e.preventDefault();
