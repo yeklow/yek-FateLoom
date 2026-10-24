@@ -2166,6 +2166,22 @@ async function generatePlan(opt) {
     }
 
     const xps = (opt.xps && opt.xps.length) ? opt.xps : pickXp();
+    // 给模型一份「干净的名字清单」——条目名里带 角色卡/（母亲） 这些，直接给它会照抄
+    const KNOWN_NOISE = /世界观|背景|体态|体型|文风|判断|设定|规则|说明|系统|地图|地理|时间|关系|概要|简介|总结|提示|格式|顺序|概率|语料|其他|备注|序章|结局|尺寸|参数|选项|状态|数值|衣着|穿着|样例|示例|模板|参考|速览|指南|路线/i;
+    const knownNames = (function () {
+        const out = new Set();
+        for (const e of Object.values(entries)) {
+            let c = String(e.comment || "").trim();
+            if (!c || /^(TavernDB|ACU-)/i.test(c)) continue;
+            c = c.replace(/^(?:角色卡|NSFW档案|身体配置|性癖档案)\s*/, "").replace(/_(?:行为落地指南|出场时机)$/, "");
+            const mk = c.match(/^([\u4e00-\u9fa5A-Za-z]{2,4})\s*[（(]/);
+            const nm = (mk ? mk[1] : c.split(/[_\-—·]/)[0]).trim();
+            if (!nm || nm.length < 2 || nm.length > 6) continue;
+            if (KNOWN_NOISE.test(nm)) continue;
+            out.add(nm);
+        }
+        return [...out];
+    })();
     const existing = Object.values(entries).map(e => String(e.comment || '')).join('、');
     const coreInfo = CORE_NAMES.map(nm => {
         const e = Object.values(entries).find(x => String(x.comment) === nm);
@@ -2174,7 +2190,8 @@ async function generatePlan(opt) {
 
     const prompt = [
         activeSystem(), '', '===== 输入 =====', sourceBlock, '',
-        '【目标世界书已有条目名（避免重名）】' + existing.slice(0, 1500), '',
+        '【目标世界书已有条目名（避免重名）】' + existing.slice(0, 1200), '',
+        '【可以在关系里引用的角色名（rel_list 的 who 必须从这里选，不能编）】' + (knownNames.length ? knownNames.join('、') : '（这本书里还没有别的角色）'), '',
         '【六条核心条目当前内容】', coreInfo, '',
         xpRule(xps),
         genderRule(),
@@ -2194,6 +2211,29 @@ async function generatePlan(opt) {
         if (p && (p.character || p.entries)) plan = p;
     }
     if (!plan) throw new Error(lastErr);
+
+    // 校验：关系必须指向真实存在的角色，否则导演没法用她这条线
+    const relOk = function (p) {
+        const rl = (p && p.character && Array.isArray(p.character.rel_list)) ? p.character.rel_list : [];
+        if (!knownNames.length) return true;                       // 书里没别人，放过
+        return rl.some(function (x) {
+            const who = String((x && x.who) || "").trim();
+            if (!who) return false;
+            return knownNames.some(function (n) { return who === n || who.indexOf(n) >= 0 || n.indexOf(who) >= 0; });
+        });
+    };
+    if (plan && knownNames.length && !relOk(plan)) {
+        console.log("[命运织机] 关系指向不存在的人，重试一次");
+        try {
+            const strictPrompt = prompt + NL2 + NL2 +
+                "【上次输出不合格】rel_list 里没有一个是这本书里真实存在的角色。" + NL2 +
+                "只能从这些名字里选：" + knownNames.join("、") + NL2 +
+                "至少写一个人，who 必须和上面的名字完全一致。重新输出完整 JSON。";
+            const raw2 = await callLLM(strictPrompt);
+            const p2 = parseLoose(raw2);
+            if (p2 && (p2.character || p2.entries) && relOk(p2)) plan = p2;
+        } catch (e) { console.warn("[命运织机] 关系重试失败", e); }
+    }
 
     plan.character = plan.character || {};
     plan.nsfw = plan.nsfw || {};
