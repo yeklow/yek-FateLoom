@@ -974,6 +974,35 @@ function gatherFromChar() {
 const state = { rewrite: null, autoScanBusy: false, bookFix: null, bookFixUndo: null, tab: 'add', plan: null, books: [], candidates: [], detecting: false, detectedFor: '', detectError: '', drafts: [], genBusy: false, curAlias: [], existingNames: new Set(), updateChars: [], updateChar: null, updatePlan: null, updateDiff: null };
 
 // ── 手动检测（只找人不生成） ─────────────────────
+// 这本书里是不是已经有这个人（双向包含 + 清洗后比对）
+// 生成前最后一道闸门 —— 宁可多查一次，也别白花 token
+async function bookHasPerson(book, name) {
+    const n0 = cleanPersonName(String(name || ''));
+    if (!n0 || !book) return false;
+    const pool = [];
+    // 有缓存就直接用（不要为了判定去触发 LLM 扫描，那反而更费）
+    try {
+        if (state.dirCache && state.dirCache.book === book) {
+            for (const ch of (state.dirCache.chars || [])) if (ch && ch.name) pool.push(String(ch.name));
+        }
+    } catch (e) {}
+    try {
+        const d = await getBook(book);
+        for (const e2 of Object.values(d.entries || {})) {
+            const c = String(e2.comment || '');
+            if (/^(TavernDB|ACU-)/i.test(c)) continue;
+            pool.push(c);
+            pool.push(cleanPersonName(c));
+            for (const k of (e2.key || [])) pool.push(String(k));
+        }
+    } catch (e) {}
+    for (const x of pool) {
+        if (!x || x.length < 2) continue;
+        if (x === n0 || x.indexOf(n0) >= 0 || n0.indexOf(x) >= 0) return true;
+    }
+    return false;
+}
+
 async function detectCandidates(force) {
     const dp = detectPool();
     const chat = dp.pool;
@@ -1174,10 +1203,15 @@ async function autoRun() {
         const known = new Set();
         for (const e of es) {
             const c = String(e.comment || '');
-            if (!/^(TavernDB|AUTO-)/.test(c)) known.add(c);
+            if (!/^(TavernDB|ACU-)/i.test(c)) { known.add(c); known.add(cleanPersonName(c)); }
             for (const k of (e.key || [])) known.add(String(k));
         }
         for (const dr of (state.drafts || [])) known.add(dr.name);
+        // 识别出来的干净人名也算已存在，否则「神乐绫音（人设核心）」挡不住「神乐绫音」
+        try {
+            const cch = await refreshDirCache(book);
+            for (const ch of (cch.chars || [])) if (ch && ch.name) known.add(String(ch.name));
+        } catch (e) {}
 
         const recent = dp.pool.map(m => String(m.mes || m.message || '')).filter(Boolean).join(NL2).slice(0, 12000);
         if (!recent.trim()) return;
@@ -1187,7 +1221,13 @@ async function autoRun() {
         const jj = parseLoose(raw);
         const cands = ((jj && jj.candidates) || [])
             .filter(c => c && c.name && String(c.name).trim().length <= 12)
-            .filter(c => !known.has(String(c.name).trim()))
+            .filter(c => {
+                const n0 = cleanPersonName(String(c.name).trim());
+                if (!n0) return false;
+                if (known.has(n0)) return false;
+                for (const x of known) { if (x && x.length >= 2 && (x.indexOf(n0) >= 0 || n0.indexOf(x) >= 0)) return false; }
+                return true;
+            })
             .slice(0, 2);
         markDetect();
         if (!cands.length) return;
@@ -1201,6 +1241,13 @@ async function autoRun() {
             const c = cands[ci];
             const nm = String(c.name).trim();
             prog.acUpdate('正在生成模板：' + nm + '（' + (ci + 1) + '/' + cands.length + '）');
+            // 已经有她就别生成了 —— 这一步就是为了不浪费 token
+            try {
+                if (await bookHasPerson(book, nm)) {
+                    console.log('[命运织机] 「' + nm + '」已经在世界书里，跳过生成');
+                    continue;
+                }
+            } catch (e2) {}
             state.drafts = state.drafts || [];
             try {
                 const plan = await generatePlan({ book, name: nm, aliases: c.alias, idea: settings().idea, source: 'chat' });
@@ -2232,6 +2279,12 @@ async function doAnalyze() {
     if (!book) return setMsg('没有可选的世界书');
     if (s.source === 'chat' && !name) return setMsg('请填人物名');
 
+    // 同一个世界书里已经有她（包含关系，不是完全相等）→ 不生成，省 token
+    try {
+        if (name && await bookHasPerson(book, name)) {
+            return setMsg('「' + name + '」这本书里已经有了（条目名可能带后缀，按包含关系算的）。要改她就去「更新角色」，别在这重写一份。', 'err');
+        }
+    } catch (e2) {}
     setMsg('分析中…这一步要几十秒');
     if ($('ac-analyze')) $('ac-analyze').disabled = true;
     state.plan = null;
@@ -2905,6 +2958,12 @@ async function runImport(names) {
     for (let i = 0; i < picked.length; i++) {
         const c = picked[i];
         progNote('正在处理「' + c.name + '」（' + (i + 1) + '/' + picked.length + '）');
+        try {
+            if (await bookHasPerson(target, c.name)) {
+                console.log('[命运织机] 「' + c.name + '」目标书里已有，跳过');
+                continue;
+            }
+        } catch (e2) {}
         try {
             const plan = await generatePlan({
                 book: target,
