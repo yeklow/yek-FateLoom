@@ -2100,6 +2100,16 @@ async function generatePlan(opt) {
         if (!g) throw new Error('当前没有选中角色卡');
         targetName = g.name;
         sourceBlock = '【原卡内容】\n' + g.block;
+    } else if (opt.source === "entries") {
+        // 用她现有的条目当素材（手写条目也能升级成织机格式）
+        const ex0 = existingEntries.map(function (e) { return String(e.content || ""); }).join(NL2).trim();
+        if (!ex0) throw new Error("这些条目没有内容，没法当素材");
+        let chatExtra = "";
+        try {
+            const hits0 = gatherFromChat(targetName, opt.aliases);
+            if (hits0.length) chatExtra = NL2 + NL2 + "【近期正文补充】" + NL2 + hits0.map(function (h) { return (h.isUser ? "【玩家】" : "【正文】") + h.text; }).join(NL2);
+        } catch (e) { /* 聊天里没有就算了 */ }
+        sourceBlock = "【她现在的条目内容，共 " + existingEntries.length + " 条】" + NL2 + ex0.slice(0, 8000) + chatExtra;
     } else {
         const hits = gatherFromChat(targetName, opt.aliases);
         if (!hits.length) throw new Error('当前聊天里找不到「' + targetName + '」');
@@ -2658,9 +2668,9 @@ async function viewUpdate() {
     h += '<div class="ac-card"><div class="h">选择要更新的角色</div>';
     const anyYaml = chars.some(function (c) { return (c.entries || []).some(function (e) { return /<character>|<NSFW档案>|^character:/m.test(String(e.content || '')); }); });
     if (!chars.length) h += '<div class="ac-empty">这本书里没认出任何角色。<br>去「出场导演」页点「LLM 扫描角色」，或手动加名字再回来。</div>';
-    else if (!anyYaml) h += '<div class="ac-empty" style="color:#ffd479">认出了 ' + chars.length + ' 个角色，但她们的条目不是织机生成的格式（没有 &lt;character&gt; 结构），「更新」无从比对。<br>' +
-        '想给她们做正式角色卡的话，去「添加角色」按正文重新生成。</div>';
     else {
+        if (!anyYaml) h += '<div class="hint" style="color:#ffd479;margin-bottom:10px">认出的 ' + chars.length +
+            ' 个用的是手写条目，不是织机格式。选中一个人 → 点下面的「升级成织机格式」，以她现在的条目当素材重新生成 4 条标准条目（原文不动）。</div>';
         h += chars.map(function (c) {
             return '<div class="ac-row ac-upick" data-name="' + esc(c.name) + '">' +
                 '<span class="c">' + (c.name === picked ? '<span class="dot">●</span> ' : '') + esc(c.name) + '</span>' +
@@ -2673,6 +2683,7 @@ async function viewUpdate() {
         h += '<div class="ac-card"><div class="h">重新分析「' + esc(picked) + '」</div>' +
             '<div class="hint" style="margin-bottom:10px">会先收集正文里她的描写，再结合她现有的设定，生成更新版。</div>' +
             '<button class="ac-btn pri" id="ac-upd-run">重新分析</button>' +
+            '<button class="ac-btn" id="ac-upd-upgrade" style="margin-left:8px">升级成织机格式</button>' +
             '<div class="ac-msg" id="ac-upd-msg"></div></div>';
     }
 
@@ -2725,6 +2736,47 @@ function wireUpdate() {
         });
     });
     $('ac-upd-apply')?.addEventListener('click', applyUpdate);
+    $('ac-upd-upgrade')?.addEventListener('click', function () { runUpgrade(); });
+}
+
+// 把现有条目当素材，升级成织机格式（不依赖聊天里出现过她）
+async function runUpgrade() {
+    const c = state.updateChar;
+    if (!c) return;
+    const msg = function (t, k) { const m = $("ac-upd-msg"); if (m) { m.textContent = t; m.className = "ac-msg" + (k ? " " + k : ""); } };
+    msg("正在把她的现有条目改写成织机格式…");
+    const btn = $("ac-upd-run"); if (btn) btn.disabled = true;
+    const prog = toastProgress("正在升级「" + c.name + "」…");
+    try {
+        const plan = await generatePlan({
+            book: effectiveBook(),
+            name: c.name,
+            aliases: [],
+            idea: settings().idea,
+            source: "entries",
+            existing: c.entries,
+        });
+        const next = planToEntries(plan);
+        const diff = [];
+        for (const e of next) {
+            const old = c.entries.find(function (x) { return x.comment === e.comment; });
+            diff.push({
+                comment: e.comment, edited: false,
+                old: old ? old.content : "",
+                neu: e.content, keys: e.keys,
+                oldLen: old ? old.content.length : 0,
+                newLen: e.content.length, take: true,
+            });
+        }
+        state.updatePlan = plan;
+        state.updateDiff = diff;
+        prog.acDone("升级方案已生成：" + diff.length + " 条待确认");
+        render();
+    } catch (e) {
+        prog.acDone("升级失败：" + (e.message || e), 8000);
+        msg("失败：" + (e.message || e), "err");
+    }
+    if (btn) btn.disabled = false;
 }
 
 async function runUpdate() {
