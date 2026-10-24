@@ -3612,6 +3612,16 @@ function directorPick() {
     }
 
     // 每个人：上次出现楼层（从记录里取，没有就从正文里找最后一次提到）
+    // 谁此刻在场（数据库的 present 标记）
+    const rows0 = active.map(function (c) {
+        const d = (function (n) {
+            if (dbCast[n]) return dbCast[n];
+            for (const k of Object.keys(dbCast)) { if (k && (n.indexOf(k) >= 0 || k.indexOf(n) >= 0)) return dbCast[k]; }
+            return null;
+        })(c.name);
+        return { name: c.name, present: !!(d && d.present) };
+    });
+
     const rows = active.map(function (c) {
         let last = log[c.name] !== undefined ? log[c.name] : -1;
         if (last < 0) {
@@ -3632,8 +3642,15 @@ function directorPick() {
             });
             kwHit = kw.filter(function (k) { return recent.indexOf(k) >= 0; });
         }
+        // 认识的人此刻在场 —— 这本身就是一条介入线索：她可能来找人，别人也可能提起她
+        const myRel = (c.relations || []).map(String).filter(function (x) { return x && x.length >= 2; });
+        const relHit = myRel.filter(function (x) {
+            return rows0.some(function (r) { return r.present; }) && rows0.some(function (r) {
+                return r.present && (r.name === x || r.name.indexOf(x) >= 0 || x.indexOf(r.name) >= 0);
+            });
+        });
         const hit = sceneHit.length ? sceneHit : kwHit;
-        return { name: c.name, hint: c.hint, gap: gap, last: last, never: never, hit: hit, scenes: c.scenes || [], kwHit: kwHit };
+        return { name: c.name, hint: c.hint, gap: gap, last: last, never: never, hit: hit, scenes: c.scenes || [], kwHit: kwHit, relHit: relHit };
     });
 
     // 数据库说他在场的，直接从候选里剔除（他已经在这个画面里了）
@@ -3647,13 +3664,15 @@ function directorPick() {
     }
 
     // 场景命中优先；命中里挑间隔最大的
-    const matched = pool.filter(function (r) { return r.hit.length > 0; });
+    const matched = pool.filter(function (r) { return r.hit.length > 0 || (r.relHit || []).length > 0; });
     const chance = s.directorAllowRandom ? Math.max(0, Math.min(100, Number(s.directorChance) || 0)) : 0;
     let pick = null;
 
     if (matched.length) {
         // 场景真的有对上的人：从命中里挑间隔最大的
-        pick = matched.sort(function (a, b) { return b.hit.length - a.hit.length || b.gap - a.gap; })[0];
+        // 场景命中 > 熟悉的人在场 > 间隔大的
+        const w = function (r) { return r.hit.length * 10 + (r.relHit || []).length * 3; };
+        pick = matched.sort(function (a, b) { return w(b) - w(a) || b.gap - a.gap; })[0];
     } else if (s.directorNewbie && pool.some(function (r) { return r.never; })) {
         // 用户开了「允许新人硬上」：从没出场过的人里挑一个关键词最多的
         const newbies = pool.filter(function (r) { return r.never; });
@@ -3684,7 +3703,9 @@ function directorPick() {
             return !!(d && (d.place || d.relations && d.relations.length));   // 数据库记过她 = 剧情里出现过
         };
         const cold = pool.filter(function (r) {
-            return r.gap >= mildNeed && knownToStory(r) && ((r.scenes || []).length || r.hint);
+            const hasAngle = (r.scenes || []).length || r.hint || (r.relHit || []).length;
+            const relAngle = (r.relHit || []).length > 0;   // 认识的人在场，别人自然可能提起她
+            return r.gap >= mildNeed && (knownToStory(r) || relAngle) && hasAngle;
         });
         if (cold.length) {
             const maxG = Math.max.apply(null, cold.map(function (r) { return r.gap; }));
