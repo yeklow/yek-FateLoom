@@ -2704,9 +2704,11 @@ async function viewUpdate() {
         h += '<div class="ac-card"><div class="h">更新预览：' + esc(r.comment) + '</div>' +
             '<div class="hint">旧 ' + r.old.length + ' 字 → 新 ' + r.neu.length + ' 字</div>' +
             '<textarea id="ac-rw-text" style="width:100%;height:240px;margin-top:10px">' + esc(r.neu) + '</textarea>' +
+            '<div class="hint" style="color:#ffd479;margin-top:8px">⚠ 写入会<b>覆盖这一条的正文</b>。条目名、关键词、顺序都不变；旧的正文会被记下来，可以撤销。</div>' +
             '<div style="display:flex;gap:8px;margin-top:10px">' +
             '<button class="ac-btn pri" id="ac-rw-apply">写入这条</button>' +
             '<button class="ac-btn" id="ac-rw-cancel">取消</button></div></div>';
+        h += '<div style="margin-top:8px"><button class="ac-btn" id="ac-rw-undo">撤销上次写入</button></div>';
     }
     if (state.updateDiff && state.updateDiff.length) h += renderUpdateDiff();
 
@@ -2763,6 +2765,11 @@ function wireUpdate() {
     });
     $('ac-rw-apply')?.addEventListener('click', applyRewrite);
     $('ac-rw-cancel')?.addEventListener('click', function () { state.rewrite = null; render(); });
+    $('ac-rw-undo')?.addEventListener('click', async function () {
+        const prog = toastProgress('正在撤销…');
+        try { const u = await undoRewrite(); prog.acDone('已恢复「' + u.comment + '」的原文'); render(); }
+        catch (e) { prog.acDone('撤销失败：' + (e.message || e), 8000); }
+    });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2812,9 +2819,26 @@ async function runRewrite(uid) {
     }
 }
 
+async function undoRewrite() {
+    const u = state.rewriteUndo;
+    if (!u) throw new Error('没有可撤销的更新');
+    const book = effectiveBook();
+    const data = await getBook(book);
+    const ent = Object.values(data.entries || {}).find(function (e) { return String(e.uid) === String(u.uid); });
+    if (!ent) throw new Error('这条条目已经不在了');
+    ent.content = u.old;
+    await putBook(book, data);
+    state.rewriteUndo = null;
+    await refreshDirCache();
+    return u;
+}
+
 async function applyRewrite() {
     const r = state.rewrite;
     if (!r) return;
+    // 用预览框里用户改过的内容（如果有）
+    const box = $('ac-rw-text');
+    if (box && String(box.value || '').trim()) r.neu = String(box.value);
     const book = effectiveBook();
     const prog = toastProgress('正在写入…');
     try {
@@ -2823,6 +2847,7 @@ async function applyRewrite() {
         if (!ent) throw new Error('这条条目已经不在了');
         const before = String(ent.content || '');
         ent.content = r.neu;
+        state.rewriteUndo = { uid: ent.uid, comment: String(ent.comment || ''), old: before, at: Date.now() };
         await putBook(book, data);
         state.rewrite = null;
         await refreshDirCache();
