@@ -2611,7 +2611,10 @@ async function viewUpdate() {
         '<div class="hint">当前这本里找到 ' + chars.length + ' 个角色。</div></div>';
 
     h += '<div class="ac-card"><div class="h">选择要更新的角色</div>';
-    if (!chars.length) h += '<div class="ac-empty">这本书里没有符合命名规范的角色条目</div>';
+    const anyYaml = chars.some(function (c) { return (c.entries || []).some(function (e) { return /<character>|<NSFW档案>|^character:/m.test(String(e.content || '')); }); });
+    if (!chars.length) h += '<div class="ac-empty">这本书里没认出任何角色。<br>去「出场导演」页点「LLM 扫描角色」，或手动加名字再回来。</div>';
+    else if (!anyYaml) h += '<div class="ac-empty" style="color:#ffd479">认出了 ' + chars.length + ' 个角色，但她们的条目不是织机生成的格式（没有 &lt;character&gt; 结构），「更新」无从比对。<br>' +
+        '想给她们做正式角色卡的话，去「添加角色」按正文重新生成。</div>';
     else {
         h += chars.map(function (c) {
             return '<div class="ac-row ac-upick" data-name="' + esc(c.name) + '">' +
@@ -2866,6 +2869,7 @@ async function refreshDirCache(forBook) {
 
     // 可信度：3 = 角色卡 / 手动填的，2 = 行动路线，1 = 从条目名猜的
     const namePri = new Map();
+    const markerNames = new Set();
     const addName = function (raw, pri) {
         const nm0 = cleanName(raw);
         if (!nm0) return;
@@ -2910,6 +2914,19 @@ async function refreshDirCache(forBook) {
     for (const e of vals) {
         const c = String(e.comment || "");
         if (/^(TavernDB|ACU-)/i.test(c)) continue;
+        // ① 「名字（备注）」—— 最常见的写法：苏芊语（母亲）/ 顾婉清（青梅）/ 凌晓（小混混）
+        const pr = c.match(/^\s*([\u4e00-\u9fa5A-Za-z]{2,4})\s*[（(]\s*([^）)]{1,10})\s*[)）]\s*$/);
+        if (pr) {
+            const NOISE = /世界观|背景|体态|体型|文风|判断|设定|规则|说明|系统|地图|地理|时间|关系|概要|简介|总结|提示|格式|顺序|插入|深度|概率|语料|其他|备注|序章|开场|结局|尺寸|参数|选项|状态|数值|衣着|穿着|样例|示例|模板|参考/i;
+            if (!NOISE.test(pr[1]) && !NOISE.test(pr[2])) { addName(pr[1], 3); markerNames.add(pr[1]); continue; }
+        }
+        // ② 显式标记：浅草-猫妖-（人设核心） / 玉藻 人设核心 / 白练华（身体设定）
+        const mk = c.match(/^\s*(.+?)[\s_\-—·（(【\[]*(人设核心|人设|身体设定|身体|瑟瑟设定|瑟瑟|性癖|NSFW)/i);
+        if (mk) {
+            const head0 = mk[1].split(/[_\-—·]/)[0].trim();
+            if (head0 && head0.length >= 2 && head0.length <= 8) { addName(head0, 4); markerNames.add(head0); continue; }
+        }
+        // ③ 插件自己的规范命名
         let m = c.match(/^(?:角色卡|身体配置|性癖档案|NSFW档案)\s*[:：]?\s*(.+)$/);
         if (m) { addName(m[1], 3); continue; }
         m = c.match(/^(.+?)[_\-—]?(?:行为落地指南|出场时机|介入机会)$/);
@@ -2943,6 +2960,7 @@ async function refreshDirCache(forBook) {
         if (llmNames.get(n)) return 'LLM';
         if ((settings().directorCharsExtra || []).indexOf(n) >= 0) return '手动';
         if (vals.some(function (e) { return String(e.comment) === '角色卡 ' + n || String(e.comment) === 'NSFW档案 ' + n; })) return '角色卡';
+        if (markerNames.has(n)) return '条目名';
         if (namePri.get(n) === 4) return '关系速览';
         if (namePri.get(n) === 2) return '行动路线';
         return '条目名';
