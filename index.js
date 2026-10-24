@@ -584,6 +584,7 @@ const DEFAULTS = {
     directorCharsExtra: [],   // 手动补充的角色名（任何命名规范都能用）
     directorPick: {},         // 手动勾选：{ 名字: true/false }，覆盖自动判断
     dirScan: {},              // LLM 扫世界书的缓存（按书 + 指纹）
+    importReview: false,      // 从别的角色卡导入时，先放草稿给我看
     autoScan: true,            // 正则一条都认不出时，自动用 LLM 扫一次
 
 };
@@ -1344,6 +1345,10 @@ function viewAdd() {
                 return '<option value="' + c.i + '"' + sel + '>' + esc(c.name) + '　（' + esc(c.book) + '）</option>';
             }).join('') + '</select></div>' +
             '<button class="ac-btn" id="ac-imp-scan">读取人物</button>';
+        h += '<label class="ac-sw" style="margin-top:10px"><input type="checkbox" id="ac-imp-review"' +
+            (settings().importReview ? ' checked' : '') + ' /><span>生成后先放进草稿，让我看过再写</span></label>' +
+            '<div class="hint">勾上：每人生成完停在页面顶部的草稿区，逐个确认后再写。' +
+            '不勾：直接写入（写入都记了操作日志，可在「备份」页撤回）。</div>';
         if (info) {
             const pend = (info.chars || []).filter(function (x2) { return !x2.exists; });
             h += '<div class="hint" style="margin-top:10px">读到 ' + (info.chars || []).length + ' 个角色，其中 ' + pend.length + ' 个当前书里没有。</div>';
@@ -1457,6 +1462,10 @@ function viewAdd() {
 
 function wireAdd() {
     // 从别的角色卡导入
+    $('ac-imp-review')?.addEventListener('change', function (e) {
+        settings().importReview = !!e.target.checked;
+        persist();
+    });
     $('ac-imp-scan')?.addEventListener('click', async function () {
         const sel = $('ac-imp-card');
         const idx = sel ? sel.value : '';
@@ -1489,7 +1498,7 @@ function wireAdd() {
         progNote = function (m) { if (prog && prog.acUpdate) prog.acUpdate(m); };
         try {
             const r = await runImport(names);
-            prog.acDone('导入完成：成功 ' + r.done.length + ' 个' + (r.failed.length ? '，失败 ' + r.failed.length + ' 个' : ''));
+            prog.acDone(r.review ? ('已生成 ' + r.done.length + ' 个草稿，去页面顶部逐个确认') : ('导入完成：成功 ' + r.done.length + ' 个' + (r.failed.length ? '，失败 ' + r.failed.length + ' 个' : '')));
             if (r.failed.length) console.warn('[命运织机] 导入失败明细', r.failed);
             state.importInfo = null;
             await refreshDirCache();
@@ -2737,6 +2746,7 @@ async function runImport(names) {
     const picked = (info.chars || []).filter(function (x) { return names.indexOf(x.name) >= 0; });
     if (!picked.length) throw new Error('没有选中任何人');
 
+    const review = !!settings().importReview;
     const done = [];
     const failed = [];
     for (let i = 0; i < picked.length; i++) {
@@ -2751,13 +2761,20 @@ async function runImport(names) {
                 source: 'entries',
                 existing: c.entries,
             });
-            await writePlan(target, plan);
-            done.push(c.name);
+            if (review) {
+                state.drafts = state.drafts || [];
+                state.drafts.unshift({ name: c.name, plan: plan, t: Date.now(), fromImport: true });
+                done.push(c.name);
+            } else {
+                await writePlan(target, plan);
+                done.push(c.name);
+            }
         } catch (e) {
             failed.push(c.name + '：' + (e.message || e));
         }
     }
-    return { done: done, failed: failed };
+    if (review) state.drafts = (state.drafts || []).slice(0, 10);
+    return { done: done, failed: failed, review: review };
 }
 // ── 更新已有角色 ─────────────────────────────────
 async function viewUpdate() {
