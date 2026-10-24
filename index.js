@@ -584,6 +584,7 @@ const DEFAULTS = {
     directorCharsExtra: [],   // 手动补充的角色名（任何命名规范都能用）
     directorPick: {},         // 手动勾选：{ 名字: true/false }，覆盖自动判断
     dirScan: {},              // LLM 扫世界书的缓存（按书 + 指纹）
+    autoScan: true,            // 正则一条都认不出时，自动用 LLM 扫一次
 
 };
 
@@ -931,7 +932,7 @@ function gatherFromChar() {
 }
 
 // ── 状态 ─────────────────────────────────────────
-const state = { bookFix: null, bookFixUndo: null, tab: 'add', plan: null, books: [], candidates: [], detecting: false, detectedFor: '', detectError: '', drafts: [], genBusy: false, curAlias: [], existingNames: new Set(), updateChars: [], updateChar: null, updatePlan: null, updateDiff: null };
+const state = { autoScanBusy: false, bookFix: null, bookFixUndo: null, tab: 'add', plan: null, books: [], candidates: [], detecting: false, detectedFor: '', detectError: '', drafts: [], genBusy: false, curAlias: [], existingNames: new Set(), updateChars: [], updateChar: null, updatePlan: null, updateDiff: null };
 
 // ── 手动检测（只找人不生成） ─────────────────────
 async function detectCandidates(force) {
@@ -2487,6 +2488,10 @@ function viewApi() {
           <label>额外请求头（可选）</label>
           <input type="text" id="ac-headers" value="${esc(s.headers)}" placeholder="X-My-Header: value（没有就留空）" />
           <div class="hint">一行一个，格式「名字: 值」。<b>opencode 这类端点必须带 x-opencode-session —— 插件会自动补，留空也行。</b></div>
+        <div class="ac-f">
+          <label class="ac-sw"><input type="checkbox" id="ac-autoscan"${s.autoScan !== false ? ' checked' : ''} /><span>认不出角色时自动让模型扫一遍</span></label>
+          <div class="hint"><b>默认开。</b>当规则一条角色都认不出来时，自动调一次 LLM 读条目名（约 1100 token），结果按内容缓存，不会重复花钱。关掉的话就用「出场导演」页的「LLM 扫描角色」按钮手动触发。</div>
+        </div>
         </div>
         <div class="ac-f" style="display:flex;gap:14px;">
           <div style="flex:1 1 0;">
@@ -2529,6 +2534,10 @@ function wireApi() {
     });
     bind('ac-url', 'apiUrl'); bind('ac-key', 'apiKey'); bind('ac-model', 'model');
     bind('ac-headers', 'headers');
+    $('ac-autoscan')?.addEventListener('change', function (e) {
+        settings().autoScan = !!e.target.checked;
+        persist();
+    });
     $('ac-hdr-preview')?.addEventListener('click', function () {
         const out = $('ac-hdr-out');
         const txt = resolveHeaders();
@@ -3138,7 +3147,37 @@ async function refreshDirCache(forBook) {
     }
 
     state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, rosterFound: rosterFound, npcSkipped: 0, at: Date.now() };
+    // 自动兜底：一个角色都没认出来，说明命名完全不合规范 —— 让模型读一遍条目
+    const sc0 = (settings().dirScan || {})[book];
+    const scanHashNow = (function () {
+        try { return scanHash(vals); } catch (e) { return ""; }
+    })();
+    if (settings().autoScan !== false
+        && !chars.length
+        && !state.autoScanBusy
+        && !(state.autoScanFailed && state.autoScanFailed[scanHashNow])
+        && String(settings().apiKey || "").trim()
+        && !(sc0 && sc0.hash === scanHashNow)) {
+        state.autoScanBusy = true;
+        console.log("[命运织机] 规则认不出任何角色，自动调用 LLM 扫描…");
+        const prog = (typeof toastProgress === "function") ? toastProgress("认不出角色，正在让模型扫一遍这本书…") : null;
+        llmScanCharacters(false).then(function () {
+            state.autoScanBusy = false;
+            if (prog) prog.acDone("模型扫描完成");
+            return refreshDirCache(book);
+        }).then(function () {
+            try { renderMini(false); } catch (e) {}
+            try { if ($("ac-overlay") && $("ac-overlay").style.display !== "none") render(); } catch (e) {}
+        }).catch(function (e) {
+            state.autoScanBusy = false;
+                state.autoScanFailed = state.autoScanFailed || {};
+                state.autoScanFailed[scanHashNow] = true;   // 这本书别再自动试了
+            if (prog) prog.acDone("自动扫描失败：" + (e.message || e), 8000);
+            console.warn("[命运织机] 自动扫描失败", e);
+        });
+    }
     return state.dirCache;
+
 }
 
 // 首页文本数组
