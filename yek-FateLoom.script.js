@@ -615,7 +615,7 @@ const DEFAULTS = {
     directorNotify: true,     // 导演动手时弹提示
     dirLog: {},               // 每个聊天的出场记录
     directorCharsExtra: [],   // 手动补充的角色名（任何命名规范都能用）
-    directorIncludeNpc: false, // 把数据库里的次要 NPC 也算进来
+    directorPick: {},         // 手动勾选：{ 名字: true/false }，覆盖自动判断
     dirScan: {},              // LLM 扫世界书的缓存（按书 + 指纹）
 
 };
@@ -1094,6 +1094,15 @@ async function listCharacters(book) {
         if (m) names.add(m[1].trim());
     }
     const out = [];
+    const srcOf = function (n) {
+        const hit = llmNames.get(n);
+        if (hit) return 'LLM';
+        if ((settings().directorCharsExtra || []).indexOf(n) >= 0) return '手动';
+        if (vals.some(function (e) { return String(e.comment) === '角色卡 ' + n || String(e.comment) === 'NSFW档案 ' + n; })) return '角色卡';
+        if (namePri.get(n) === 4) return '关系速览';
+        if (namePri.get(n) === 2) return '行动路线';
+        return '条目名';
+    };
     for (const n of names) {
         const mine = es.filter(function (e) {
             const c = String(e.comment || "");
@@ -3036,7 +3045,7 @@ async function refreshDirCache() {
                 }
             }
         }
-        chars.push({ name: n, scenes: [...new Set(scenes)], hint: hint, presence: presenceText, keys: [...new Set(myKeys)], relations: [...new Set(relList)], knownToUser: knownToUser });
+        chars.push({ name: n, scenes: [...new Set(scenes)], hint: hint, presence: presenceText, keys: [...new Set(myKeys)], relations: [...new Set(relList)], knownToUser: knownToUser, source: srcOf(n) });
     }
 
     // 读数据库维护的「重要角色表」：谁在场、谁在哪（比数楼层准）
@@ -3122,10 +3131,15 @@ async function refreshDirCache() {
         if (dup) continue;
         npcPool.push({ name: n, scenes: [], hint: '', dbOnly: true, npc: true });
     }
-    // 数据库里的次要 NPC：只有打开开关才纳入（默认只推荐主要角色）
-    if (settings().directorIncludeNpc) chars.push.apply(chars, npcPool);
+    // 次要 NPC 也全部保留（界面上让用户勾选），只是默认不启用
+    chars.push.apply(chars, npcPool);
+    // 手动勾选覆盖自动判断；没勾过的按「是不是 NPC」决定
+    const picks = settings().directorPick || {};
+    for (const ch of chars) {
+        ch.enabled = (picks[ch.name] !== undefined) ? !!picks[ch.name] : !ch.npc;
+    }
 
-    state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, npcSkipped: settings().directorIncludeNpc ? 0 : npcPool.length, at: Date.now() };
+    state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, npcSkipped: 0, at: Date.now() };
     return state.dirCache;
 }
 
@@ -3138,6 +3152,8 @@ function msgTexts() {
 function directorPick() {
     const cache = state.dirCache;
     if (!cache || !cache.chars || !cache.chars.length) return null;
+    const active = cache.chars.filter(function (c) { return c.enabled !== false; });
+    if (!active.length) return null;
     const s = settings();
     const texts = msgTexts();
     const n = texts.length;
@@ -3164,7 +3180,7 @@ function directorPick() {
     }
 
     // 每个人：上次出现楼层（从记录里取，没有就从正文里找最后一次提到）
-    const rows = cache.chars.map(function (c) {
+    const rows = active.map(function (c) {
         let last = log[c.name] !== undefined ? log[c.name] : -1;
         if (last < 0) {
             for (let i = n - 1; i >= 0; i--) {
@@ -3207,7 +3223,7 @@ function directorPick() {
         // 从没出场过的人不能被轻提 —— 主角根本不认识她（否则一条短信、一件外套都会很突兀）
         const knownToStory = function (r) {
             if (r.last >= 0) return true;              // 本聊天里被提到过
-            const cc = (cache.chars || []).find(function (x) { return x.name === r.name; });
+            const cc = active.find(function (x) { return x.name === r.name; });
             if (cc && cc.knownToUser) return true;     // 角色卡里写了她和主角有关系
             const d = dbOf(r.name);
             return !!(d && (d.place || d.relations && d.relations.length));   // 数据库记过她 = 剧情里出现过
@@ -3360,6 +3376,8 @@ function viewDirector() {
     const s = settings();
     const cache = state.dirCache;
     const rows = (cache && cache.chars) || [];
+    const allChars = (cache && cache.chars) || [];
+    const activeCount = allChars.filter(function (c) { return c.enabled !== false; }).length;
     const last = state.dirLast;
 
     let h = '<h2>出场导演</h2>';
@@ -3420,16 +3438,26 @@ function viewDirector() {
                 (present.length ? '（' + esc(present.join('、')) + '）' : '') + '<br>' +
                 '在场的人不会被推荐出场，在别处的人会降低优先级。</div>';
         })() +
-        '<div class="ac-sw" style="margin-top:12px"><input type="checkbox" id="ac-dir-npc"' + (s.directorIncludeNpc ? ' checked' : '') + ' /><span>把数据库里的次要 NPC 也纳入</span></div>' +
-        '<div class="hint" style="margin-top:4px">默认只推荐主要角色（人物关系速览 / 角色卡 / LLM 认出来的）。' +
-        '数据库中那些没进关系速览的人（例如某人的父亲、路人甲）不会出现在名单里。' +
-        (state.dirCache && state.dirCache.npcSkipped ? '目前排除了 <b>' + state.dirCache.npcSkipped + '</b> 个。' : '') + '</div>' +
-
-        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
-        '<button class="ac-btn" id="ac-dir-refresh">重新读取</button>' +
-        '<button class="ac-btn pri" id="ac-dir-scan">LLM 扫描角色</button>' +
+        '<div class="ac-card" style="margin-top:14px;background:#1b2224">' +
+        '<div class="h" style="font-size:14px">角色清单 <span style="margin-left:auto;font-weight:400;color:#6f8080;font-size:12px">' +
+            activeCount + ' / ' + allChars.length + ' 个启用</span></div>' +
+        '<div class="hint">勾掉不想让导演推荐的人。默认只勾主要角色（关系速览 / 角色卡 / LLM 认得出来的），' +
+        '只有数据库表里出现过的人默认不勾。</div>' +
+        '<div style="display:flex;gap:6px;margin:10px 0">' +
+        '<button class="ac-btn" id="ac-pick-all">全选主要</button>' +
+        '<button class="ac-btn" id="ac-pick-none">全不选</button>' +
         '</div>' +
-        (function () {
+        '<div style="max-height:300px;overflow:auto">' +
+        allChars.map(function (c) {
+            const on = c.enabled !== false;
+            const src = c.npc ? '数据库' : (c.source || '未知');
+            return '<label class="ac-chk" style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid #232a2c;cursor:pointer">' +
+                '<input type="checkbox" data-pick="' + esc(c.name) + '"' + (on ? ' checked' : '') + ' />' +
+                '<span style="flex:1 1 auto">' + esc(c.name) + (c.npc ? ' <span style="color:#6f8080;font-size:12px">（次要）</span>' : '') + '</span>' +
+                '<span style="font-size:11px;color:#6f8080">' + esc(src) + '</span>' +
+                '</label>';
+        }).join('') +
+        '</div></div>' +        (function () {
             const sc0 = (s.dirScan || {})[s.targetBook];
             if (!sc0) return '<div class="hint" style="margin-top:8px">还没用 LLM 扫过。扫描会把条目名和关键词发给模型（约 1 次请求），' +
                 '让它判断哪些条目属于同一个人物 —— 命名再乱也能认出来。<b>世界书内容变了需要重扫。</b></div>';
@@ -3487,9 +3515,30 @@ function wireDirector() {
     const idle = $('ac-dir-idle');
     if (idle) idle.addEventListener('change', function () { settings().directorIdleOnly = idle.checked; persist(); });
 
-    const npcSw = $('ac-dir-npc');
-    if (npcSw) npcSw.addEventListener('change', async function () {
-        settings().directorIncludeNpc = !!npcSw.checked;
+    // 角色清单：逐个勾选
+    document.querySelectorAll('[data-pick]').forEach(function (box) {
+        box.addEventListener('change', async function () {
+            const nm = box.dataset.pick;
+            const st = settings();
+            st.directorPick = st.directorPick || {};
+            st.directorPick[nm] = !!box.checked;
+            persist();
+            await refreshDirCache();
+            render();
+        });
+    });
+    $('ac-pick-all')?.addEventListener('click', async function () {
+        const st = settings();
+        st.directorPick = {};
+        for (const c of ((state.dirCache && state.dirCache.chars) || [])) st.directorPick[c.name] = !c.npc;
+        persist();
+        await refreshDirCache();
+        render();
+    });
+    $('ac-pick-none')?.addEventListener('click', async function () {
+        const st = settings();
+        st.directorPick = {};
+        for (const c of ((state.dirCache && state.dirCache.chars) || [])) st.directorPick[c.name] = false;
         persist();
         await refreshDirCache();
         render();
