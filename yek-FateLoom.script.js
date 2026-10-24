@@ -1085,7 +1085,8 @@ async function detectCandidates(force) {
 // 从世界书里找出已存在的角色（靠条目名反推）
 async function listCharacters(book) {
     // 和「出场导演」用同一套识别逻辑，不再各写一份（否则会漏人、重复）
-    const cache = await refreshDirCache(book);
+    // 缓存已经是这本书就直接复用，不然每打开一次页面要读两遍世界书
+    const cache = (state.dirCache && state.dirCache.book === book) ? state.dirCache : await refreshDirCache(book);
     const data = await getBook(book);
     const es = Object.values(data.entries || {});
     const scanChars = (((settings().dirScan || {})[book] || {}).chars) || [];
@@ -3409,6 +3410,7 @@ async function refreshDirCache(forBook) {
     for (const n of names) {
         let scenes = [];
         let hint = '';
+        const hooks = [];
         if (tl) {
             const body = String(tl.content || '');
             // 找她的段落
@@ -3425,7 +3427,6 @@ async function refreshDirCache(forBook) {
                 }
             }
             if (seg) {
-                const hooks = [];
                 for (const line of seg.split('\n')) {
                     const arrow = line.indexOf('→');
                     if (arrow > 0) {
