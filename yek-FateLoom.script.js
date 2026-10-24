@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
- * yek命运织机 v0.6.0 —— 酒馆助手（Tavern Helper）单文件版
+ * yek鍛借繍缁囨満 v0.6.1 —— 酒馆助手（Tavern Helper）单文件版
  *
  * 用法：酒馆助手 → 脚本库 → 新建脚本 → 粘贴本文件全部内容 → 保存
  * 依赖：JS-Slash-Runner（酒馆助手）4.x
@@ -20,7 +20,7 @@
     const getContext = function () {
         try { if (typeof SillyTavern !== "undefined" && SillyTavern.getContext) return SillyTavern.getContext(); } catch (e) {}
         try { if (W.SillyTavern && W.SillyTavern.getContext) return W.SillyTavern.getContext(); } catch (e) {}
-        throw new Error("yek命运织机：找不到酒馆上下文，请确认已装酒馆助手（JS-Slash-Runner）");
+        throw new Error("yek鍛借繍缁囨満：找不到酒馆上下文，请确认已装酒馆助手（JS-Slash-Runner）");
     };
 
     // ── 注入样式 ──
@@ -36,7 +36,7 @@
     })();
 
 // ═══════════════════════════════════════════════════════════
-// yek命运织机 v0.6 —— 出场导演 + LLM 扫世界书
+// yek命运织机 v0.6.1 —— 出场导演 + LLM 扫世界书
 // ═══════════════════════════════════════════════════════════
 
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
