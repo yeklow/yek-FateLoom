@@ -3705,90 +3705,28 @@ function directorPick() {
         return { skip: true, why: '所有人都在间隔门槛内（' + gapNeed + ' 楼），这一轮不推荐', all: rows };
     }
 
-    // 策略一：指定角色优先 —— 你选的人，只要够久没出场、场景又不在激烈冲突里，就让她出
+    // 指定角色：你选的人优先（点过「立刻」就跳过节流）
     if (s.directorMode === 'pin' && s.directorPin) {
         const pinName = String(s.directorPin);
-        // 手动点过「立刻让她出场」的话，跳过节流门槛（仍然排除已经在这个画面里的人）
-        const force = (state.forceNext && state.forceNext === pinName) ? rows.filter(function (r) { return !inScene.includes(r.name); }) : pool;
-        const pinned = force.find(function (r) { return r.name === pinName || r.name.indexOf(pinName) >= 0 || pinName.indexOf(r.name) >= 0; });
+        const force = (state.forceNext && state.forceNext === pinName)
+            ? rows.filter(function (r) { return !inScene.includes(r.name); })
+            : pool;
+        const pinned = force.find(function (r) {
+            return r.name === pinName || r.name.indexOf(pinName) >= 0 || pinName.indexOf(r.name) >= 0;
+        });
         if (pinned) {
-            pinned.strength = 'strong';   // 用户明确指定的人，一律按「请安排」
+            pinned.strength = 'strong';
             if (state.forceNext === pinName) { state.forceNext = ''; pinned.forced = true; }
             return { pick: pinned, all: rows, byMode: 'pin' };
         }
     }
-    // 策略二：久未出场优先 —— 不管有没有线索，谁最久没出现就推谁
-    if (s.directorMode === 'rotate') {
-        const sorted2 = pool.slice().sort(function (a, b) {
-            // 有线索的先上（自然），都没线索就谁最久没出场谁上
-            const ha = ((a.hit || []).length * 100) + Math.min(a.gap, 99);
-            const hb = ((b.hit || []).length * 100) + Math.min(b.gap, 99);
-            return hb - ha;
-        });
-        // 前几名里随机挑一个，避免每次都同一个人
-        // 严格按顺序：谁最久没出现就谁，不随机 —— 出场过就排到队尾，下一个接着上
-        const top2 = sorted2[0];
-        return { pick: top2, all: rows, byMode: 'rotate' };
-    }
-    // 场景命中优先；命中里挑间隔最大的
-    const matched = pool.filter(function (r) { return r.hit.length > 0 || (r.relHit || []).length > 0; });
-    const chance = s.directorAllowRandom ? Math.max(0, Math.min(100, Number(s.directorChance) || 0)) : 0;
-    let pick = null;
 
-    if (matched.length) {
-        // 场景真的有对上的人：从命中里挑间隔最大的
-        // 场景命中 > 熟悉的人在场 > 间隔大的
-        const w = function (r) { return r.hit.length * 10 + (r.relHit || []).length * 3; };
-        pick = matched.sort(function (a, b) { return w(b) - w(a) || b.gap - a.gap; })[0];
-        // 置信度：地点词和数据库地点对得上 / 有 2 个以上命中 / 认识的人在场 / 有条目写的出场方式
-        const isPlace = function (x) { return /厨房|客厅|卧室|浴室|卫生间|走廊|电梯|楼梯|玄关|书房|教室|办公室|医院|病房|便利店|门口|天台/.test(String(x)); };
-        const placeOk = dbPlace && (pick.hit || []).some(function (h2) { return isPlace(h2) && (dbPlace.indexOf(h2) >= 0 || h2.indexOf(dbPlace) >= 0); });
-        const strong = !!(placeOk || (pick.hit || []).length >= 2 || (pick.relHit || []).length || pick.hint);
-        pick.strength = strong ? 'strong' : 'weak';
-    } else if (s.directorNewbie && pool.some(function (r) { return r.never; })) {
-        // 用户开了「允许新人硬上」：从没出场过的人里挑一个关键词最多的
-        const newbies = pool.filter(function (r) { return r.never; });
-        const far2 = function (n) { const d = dbOf(n); return !!(d && d.place && dbPlace && d.place !== dbPlace); };
-        const near2 = newbies.filter(function (r) { return !far2(r.name); });
-        const base2 = near2.length ? near2 : newbies;
-        pick = base2.sort(function (a, b) {
-            return ((b.scenes || []).length + (b.hit || []).length) - ((a.scenes || []).length + (a.hit || []).length) || b.gap - a.gap;
-        })[0];
-    } else if (chance > 0 && Math.random() * 100 < chance) {
-        // 用户明确开了「随机偶遇」才硬插，并且只从最久没出场的人里挑
-        const far = function (n) { const d = dbOf(n); return !!(d && d.place && dbPlace && d.place !== dbPlace); };
-        const near = pool.filter(function (r) { return !far(r.name); });
-        const base = near.length ? near : pool;
-        const maxGap = Math.max.apply(null, base.map(function (r) { return r.gap; }));
-        const top = base.filter(function (r) { return r.gap >= maxGap - 1; });
-        pick = top[Math.floor(Math.random() * top.length)];
-    } else {
-        // 没有场景命中：不让她出场，但可以让世界记得她（轻提）
-        const mildNeed = gapNeed * 2;
-        // 只对「已经出场过、后来冷了」的人轻提。
-        // 从没出场过的人不能被轻提 —— 主角根本不认识她（否则一条短信、一件外套都会很突兀）
-        const knownToStory = function (r) {
-            if (r.last >= 0) return true;              // 本聊天里被提到过
-            const cc = active.find(function (x) { return x.name === r.name; });
-            if (cc && cc.knownToUser) return true;     // 角色卡里写了她和主角有关系
-            const d = dbOf(r.name);
-            return !!(d && (d.place || d.relations && d.relations.length));   // 数据库记过她 = 剧情里出现过
-        };
-        const cold = pool.filter(function (r) {
-            const hasAngle = (r.scenes || []).length || r.hint || (r.relHit || []).length;
-            const relAngle = (r.relHit || []).length > 0;   // 认识的人在场，别人自然可能提起她
-            return r.gap >= mildNeed && (knownToStory(r) || relAngle) && hasAngle;
-        });
-        if (cold.length) {
-            const maxG = Math.max.apply(null, cold.map(function (r) { return r.gap; }));
-            const top = cold.filter(function (r) { return r.gap >= maxG - 1; });
-            return { mild: true, pick: top[Math.floor(Math.random() * top.length)], all: rows };
-        }
-        return { skip: true, why: '没有人的场景对得上，也没有「已经出场过但久未出现」的人，这一轮不推荐', all: rows };
-    }
-
-    if (!pick) return { skip: true, why: '没有可推荐的人', all: rows };
-    return { pick: pick, all: rows, skipped: rows.length - pool.length };
+    // 轮流出场：谁最久没出现就推谁。不看关键词、不看场景词 ——
+    // 「阿姨」会命中「白阿姨」这种误判，按词匹配本身不可靠，索性不用。
+    const sorted = pool.slice().sort(function (x, y) { return y.gap - x.gap; });
+    const pick = sorted[0];
+    pick.strength = 'strong';
+    return { pick: pick, all: rows, byMode: 'rotate' };
 }
 
 // 生成注入文本
@@ -3799,10 +3737,6 @@ function directorText(res) {
     const gapTxt = (p.never || p.gap >= 9000) ? '还从没出场过' : (p.gap + ' 楼没出场了');
     L.push((p.strength === 'strong' ? '[出场提示 · 请安排]' : '[出场提示]') + ' ' + p.name);
     L.push((p.never || p.gap >= 9000) ? '她还从没在这个聊天里出现过。' : ('她已经 ' + p.gap + ' 楼没出现了。'));
-    if (p.hit && p.hit.length) {
-        if (p.strength === 'strong') L.push('眼下这个场景和她对得上：' + p.hit.join('、') + '。');
-        else L.push('眼下提到了：' + p.hit.join('、') + '—— 只有她确实可能在这个位置附近，才用这条。');
-    }
     // 不规定她怎么进场 —— 她的人设会随关键词一起被带进来，由模型自己写
     if (p.strength === 'middle') {
         L.push('她已经很久没露面了，这一轮可以让她出现 —— 具体怎么进场，按她的人设和你这一段的行文写。');
@@ -4548,7 +4482,7 @@ function ensureMini() {
             ? ('<div style="padding:10px 12px;line-height:1.7"><div><b style="color:#ffd479">' + esc(r.name) + '</b>' +
                '<span style="font-size:11px;color:#6f8080;margin-left:6px">会安排出场</span></div>' +
                (r.gap ? '<div style="font-size:11px;color:#6f8080">已经 ' + r.gap + ' 楼没出场</div>' : '') +
-               (r.hit && r.hit.length ? '<div style="font-size:11px;color:#6f8080">命中：' + esc(r.hit.join('、')) + '</div>' : '') +
+               
                (r.hint ? '<div style="font-size:11px;color:#6f8080;margin-top:4px">' + esc(r.hint) + '</div>' : '') + '</div>')
             : ('<div class="mini-e" style="padding:10px 12px">' + esc(r.why || '这一轮不安排出场') + '</div>');
     });
