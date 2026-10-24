@@ -928,7 +928,7 @@ function gatherFromChar() {
 }
 
 // ── 状态 ─────────────────────────────────────────
-const state = { tab: 'add', plan: null, books: [], candidates: [], detecting: false, detectedFor: '', detectError: '', drafts: [], genBusy: false, curAlias: [], existingNames: new Set(), updateChars: [], updateChar: null, updatePlan: null, updateDiff: null };
+const state = { bookFix: null, bookFixUndo: null, tab: 'add', plan: null, books: [], candidates: [], detecting: false, detectedFor: '', detectError: '', drafts: [], genBusy: false, curAlias: [], existingNames: new Set(), updateChars: [], updateChar: null, updatePlan: null, updateDiff: null };
 
 // ── 手动检测（只找人不生成） ─────────────────────
 async function detectCandidates(force) {
@@ -3466,6 +3466,16 @@ function viewDirector() {
             '<div class="ac-view" style="margin-top:8px;max-height:220px">' + esc(last.text) + '</div>' : '') +
         '</div>';
 
+    h += '<div class="ac-card" style="background:#1b2224"><div class="h">一键修复世界书</div>' +
+        '<div class="hint">有些角色认不出来，是因为她的条目名不统一，或者名字没写进关键词。' +
+        '这里可以批量修好 —— 改的是你自己的世界书，改之前会列出具体改什么。</div>' +
+        '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">' +
+        '<button class="ac-btn" id="ac-fix-scan">分析一下</button>' +
+        '<button class="ac-btn pri" id="ac-fix-apply">执行修复</button>' +
+        '<button class="ac-btn" id="ac-fix-undo">撤销上次修复</button>' +
+        '</div>' +
+        '<div id="ac-fix-out" style="margin-top:10px"></div></div>';
+
     return h;
 }
 
@@ -3661,6 +3671,122 @@ function wireBackups() {
         toast('旧快照已清空，settings.json 会瘦身（下次保存生效）');
         render();
     });
+}
+// ═══════════════════════════════════════════════════════════
+// 一键修复世界书：让导演能认出这些人
+// ═══════════════════════════════════════════════════════════
+// 判断一个条目是不是属于某个角色
+function entryBelongsTo(comment, name) {
+    const c = String(comment || '');
+    if (!c || !name) return false;
+    if (/^(TavernDB|ACU-)/i.test(c)) return false;
+    let s = c.replace(/^(?:角色卡|NSFW档案|身体配置|性癖档案)\s*/, '');
+    s = s.replace(/_(?:行为落地指南|出场时机)$/, '').trim();
+    if (s === name) return true;
+    if (s.indexOf(name) >= 0 || name.indexOf(s) >= 0) return true;
+    if (c.length > name.length && c.indexOf(name) === 0 && /^[\s_\-—（(【\[]/.test(c.slice(name.length))) return true;
+    return false;
+}
+
+// 从条目名推测它该叫什么（推测不出来就返回空）
+function guessStdName(comment, name) {
+    const c = String(comment || '');
+    if (/^(?:角色卡|NSFW档案|身体配置|性癖档案)\s/.test(c)) return '';   // 已经规范了
+    if (c === name) return '';                                          // 就是名字本身，不动
+    if (!entryBelongsTo(c, name)) return '';
+    if (/瑟瑟|性癖|NSFW|色情/i.test(c)) return '性癖档案 ' + name;
+    if (/身体|肉体|体型|身材/i.test(c)) return '身体配置 ' + name;
+    if (/人设|核心|设定|角色卡/i.test(c)) return '角色卡 ' + name;
+    return '';
+}
+
+// 分析：能补哪些关键词、能规范哪些条目名
+async function analyzeBookFix(book) {
+    const cache = await refreshDirCache(book);
+    const data = await getBook(book);
+    const vals = Object.values(data.entries || {});
+    const chars = (cache && cache.chars) || [];
+
+    const keyFixes = [];    // 缺名字关键词的条目
+    const renames = [];     // 可以规范化的条目名
+
+    for (const ch of chars) {
+        const n = ch.name;
+        const mine = vals.filter(function (e) { return entryBelongsTo(String(e.comment || ''), n); });
+        for (const e of mine) {
+            const keys = Array.isArray(e.key) ? e.key.map(String) : [];
+            if (keys.indexOf(n) < 0) {
+                keyFixes.push({ uid: e.uid, comment: String(e.comment || ''), name: n });
+            }
+            const std = guessStdName(String(e.comment || ''), n);
+            if (std && std !== String(e.comment)) {
+                renames.push({ uid: e.uid, from: String(e.comment || ''), to: std, name: n });
+            }
+        }
+    }
+    return { keyFixes: keyFixes, renames: renames, chars: chars.length };
+}
+
+// 执行修复
+async function applyBookFix(book, doKeys, doRenames) {
+    const fx = state.bookFix;
+    if (!fx) throw new Error('先分析一次');
+
+    const data = await getBook(book);
+    const ent = data.entries || {};
+    const undo = [];    // 记下改了什么，方便撤销
+    let nKeys = 0;
+    let nNames = 0;
+
+    if (doKeys) {
+        for (const f of fx.keyFixes) {
+            const e = ent[f.uid];
+            if (!e) continue;
+            const keys = Array.isArray(e.key) ? e.key.map(String) : [];
+            if (keys.indexOf(f.name) >= 0) continue;
+            undo.push({ uid: f.uid, key: keys.slice(), comment: String(e.comment || '') });
+            e.key = [f.name].concat(keys);      // 名字放第一位，保证一定命中
+            nKeys++;
+        }
+    }
+    if (doRenames) {
+        const done = new Set(undo.map(function (u) { return u.uid; }));
+        for (const r of fx.renames) {
+            const e = ent[r.uid];
+            if (!e) continue;
+            if (String(e.comment) !== r.from) continue;
+            if (!done.has(r.uid)) {
+                undo.push({ uid: r.uid, key: (Array.isArray(e.key) ? e.key.map(String) : []), comment: String(e.comment || '') });
+            }
+            e.comment = r.to;
+            nNames++;
+        }
+    }
+
+    if (!undo.length) return { nKeys: 0, nNames: 0 };
+    await putBook(book, data);
+    state.bookFixUndo = { book: book, items: undo, at: Date.now() };
+    state.bookFix = null;
+    await refreshDirCache();
+    return { nKeys: nKeys, nNames: nNames, undoable: undo.length };
+}
+
+// 撤销上一次修复
+async function undoBookFix() {
+    const u = state.bookFixUndo;
+    if (!u) throw new Error('没有可撤销的修复');
+    const data = await getBook(u.book);
+    const ent = data.entries || {};
+    for (const it of u.items) {
+        const e = ent[it.uid];
+        if (!e) continue;
+        e.key = it.key;
+        e.comment = it.comment;
+    }
+    await putBook(u.book, data);
+    state.bookFixUndo = null;
+    await refreshDirCache();
+    return u.items.length;
 }
 // ═══════════════════════════════════════════════════════════
 // 主页面浮动小面板：不用每次去开魔杖菜单
