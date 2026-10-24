@@ -3720,6 +3720,11 @@ function directorPick() {
         // 场景命中 > 熟悉的人在场 > 间隔大的
         const w = function (r) { return r.hit.length * 10 + (r.relHit || []).length * 3; };
         pick = matched.sort(function (a, b) { return w(b) - w(a) || b.gap - a.gap; })[0];
+        // 置信度：地点词和数据库地点对得上 / 有 2 个以上命中 / 认识的人在场 / 有条目写的出场方式
+        const isPlace = function (x) { return /厨房|客厅|卧室|浴室|卫生间|走廊|电梯|楼梯|玄关|书房|教室|办公室|医院|病房|便利店|门口|天台/.test(String(x)); };
+        const placeOk = dbPlace && (pick.hit || []).some(function (h2) { return isPlace(h2) && (dbPlace.indexOf(h2) >= 0 || h2.indexOf(dbPlace) >= 0); });
+        const strong = !!(placeOk || (pick.hit || []).length >= 2 || (pick.relHit || []).length || pick.hint);
+        pick.strength = strong ? 'strong' : 'weak';
     } else if (s.directorNewbie && pool.some(function (r) { return r.never; })) {
         // 用户开了「允许新人硬上」：从没出场过的人里挑一个关键词最多的
         const newbies = pool.filter(function (r) { return r.never; });
@@ -3772,14 +3777,19 @@ function directorText(res) {
     const p = res.pick;
     const L = [];
     const gapTxt = (p.never || p.gap >= 9000) ? '还从没出场过' : (p.gap + ' 楼未出场');
-    L.push('[出场提示] ' + p.name + '（' + gapTxt + '）' + (p.trig && p.trig !== p.name ? '　关键词：' + p.trig : ''));
+    L.push((p.strength === 'strong' ? '[出场提示 · 请安排] ' : '[出场提示] ') + p.name + '（' + gapTxt + '）' + (p.trig && p.trig !== p.name ? '　关键词：' + p.trig : ''));
     if (p.hit && p.hit.length) {
-        const only1 = p.hit.length === 1;
-        L.push('当前场景提到了：' + p.hit.join('、') + (only1 ? '　—— 只有她此刻真的就在那个位置附近，才用这条。' : '，适合让她介入。'));
+        if (p.strength === 'strong') L.push('当前就在：' + p.hit.join('、') + '（和她的位置对得上）。');
+        else L.push('当前场景提到了：' + p.hit.join('、') + '　—— 只有她此刻真的就在那个位置附近，才用这条。');
     }
     else if ((p.scenes || []).length) L.push('她通常在：' + p.scenes.slice(0, 4).join('、') + '（场景对得上才用）。');
     if (p.hint) L.push('她的出场方式：' + p.hint.slice(0, 90));
-    L.push('如果她此刻出现会显得突兀，就完全忽略本提示 —— 宁可这一轮没人出场。');
+    if (p.strength === 'strong') {
+        L.push('这一轮请让她出现在场景里。她已经很久没露面，这次登场合情合理。');
+        L.push('除非和当前正在发生的事直接矛盾（比如人都已经离开了这个地点），否则不要跳过这条。');
+    } else {
+        L.push('如果她此刻出现会显得突兀，就忽略本提示，让这一轮没人出场。');
+    }
     return L.join(String.fromCharCode(10));
 }
 // 一条「不在场」提示，是否需要有人在场才能成立
