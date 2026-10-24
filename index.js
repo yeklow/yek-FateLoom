@@ -662,10 +662,21 @@ function apiBase() {
 let cachedSecret = { key: '', id: '' };
 
 // 服务器中转需要把密钥存进酒馆密钥库，才能用 custom 通道
+// 有些端点必须带特定请求头，自动补上，省得用户去查文档
+function resolveHeaders() {
+    const s = settings();
+    let txt = String(s.headers || "").trim();
+    const url = String(s.apiUrl || "");
+    if (/opencode\.ai/i.test(url) && !/x-opencode-session/i.test(txt)) {
+        txt = (txt ? txt + String.fromCharCode(10) : "") + "x-opencode-session: " + (MODULE.toLowerCase().replace(/[^a-z0-9-]/g, "-"));
+    }
+    return txt;
+}
+
 async function ensureSecret() {
     const s = settings();
     const key = String(s.apiKey || '').trim();
-    if (!key) throw new Error('还没填 API 密钥');
+    if (!key) return null;                     // 有些端点不需要密钥，不要硬报错
     if (cachedSecret.key === key && cachedSecret.id) return cachedSecret.id;
 
     const res = await fetch('/api/secrets/write', {
@@ -694,6 +705,14 @@ function friendlyNetError(msg) {
     }
     if (/ETIMEDOUT|timeout|timed out/i.test(m)) {
         return m + String.fromCharCode(10, 10) + "【超时】端点没在限定时间内响应。可能是代理慢、也可能是端点本身挂了。";
+    }
+    if (/Bad Request|HTTP 400/i.test(m)) {
+        const s0 = settings();
+        let extra = '';
+        if (/opencode\.ai/i.test(String(s0.apiUrl || '')) && !/x-opencode-session/i.test(String(s0.headers || ''))) {
+            extra = String.fromCharCode(10, 10) + '【opencode 端点】它必须带 x-opencode-session 请求头，否则一律返回 400。' + String.fromCharCode(10) + '插件会自动补一个；如果仍然 400，请检查端点 URL 是否正确（例如 https://opencode.ai/zen/go/v1）。';
+        }
+        return m + extra;
     }
     if (/ENOTFOUND|getaddrinfo/i.test(m)) {
         return m + String.fromCharCode(10, 10) + "【域名解析失败】检查端点 URL 拼写，或者当前网络连不上这个域名。";
@@ -724,8 +743,8 @@ async function callLLM(prompt) {
             body: JSON.stringify({
                 chat_completion_source: 'custom',
                 custom_url: base,
-                custom_include_headers: String(s.headers || '').trim(),
-                secret_id: sid,
+                custom_include_headers: resolveHeaders(),
+                secret_id: sid || undefined,
                 model: s.model,
                 messages: [{ role: 'user', content: prompt }],
                 max_tokens: Number(s.maxTokens) || 6000,
