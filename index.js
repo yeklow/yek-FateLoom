@@ -3389,6 +3389,7 @@ async function refreshDirCache(forBook) {
                 }
             }
             if (seg) {
+                const hooks = [];
                 for (const line of seg.split('\n')) {
                     const arrow = line.indexOf('→');
                     if (arrow > 0) {
@@ -3401,7 +3402,10 @@ async function refreshDirCache(forBook) {
                                 t2 = t2.replace(/(的时候|时|了)$/, '');
                                 if (t2 && t2.length >= 2 && t2.length <= 6) scenes.push(t2);
                             }
-                        }                        if (!hint) hint = line.slice(arrow + 1).trim();
+                        }
+                        const howTxt = line.slice(arrow + 1).replace(/^\s*[-·]?\s*/, '').trim();
+                        if (howTxt) hooks.push({ signal: left || '', how: howTxt });
+                        if (!hint && howTxt) hint = howTxt;
                     }
                     const m2 = line.match(/不在场[:：]\s*(.+)$/);
                     if (m2 && !hint) hint = line.trim();
@@ -3448,7 +3452,7 @@ async function refreshDirCache(forBook) {
                 }
             }
         }
-        chars.push({ name: n, scenes: [...new Set(scenes)], hint: hint, presence: presenceText, keys: [...new Set(myKeys)], relations: [...new Set(relList)], knownToUser: knownToUser, source: srcOf(n) });
+        chars.push({ name: n, scenes: [...new Set(scenes)], hint: hint, presence: presenceText, keys: [...new Set(myKeys)], relations: [...new Set(relList)], knownToUser: knownToUser, source: srcOf(n), hooks: hooks });
     }
 
     // 读数据库维护的「重要角色表」：谁在场、谁在哪（比数楼层准）
@@ -3661,7 +3665,18 @@ function directorPick() {
             });
         });
         const hit = sceneHit.length ? sceneHit : kwHit;
-        return { name: c.name, hint: c.hint, gap: gap, last: last, never: never, hit: hit, scenes: c.scenes || [], kwHit: kwHit, relHit: relHit };
+        // 多个介入方式时，挑信号和当前命中对得上的那条，避免每次都同一句
+        let goodHint = c.hint || '';
+        const hs = c.hooks || [];
+        if (hs.length > 1) {
+            const words = (sceneHit.concat(kwHit).concat(hit)).map(String);
+            const hitHook = hs.find(function (x) {
+                const sig = String(x.signal || '');
+                return sig && words.some(function (w) { return w && (sig.indexOf(w) >= 0 || w.indexOf(sig) >= 0); });
+            });
+            goodHint = (hitHook && hitHook.how) || (hs[0] && hs[0].how) || goodHint;
+        }
+        return { name: c.name, hint: goodHint, gap: gap, last: last, never: never, hit: hit, scenes: c.scenes || [], kwHit: kwHit, relHit: relHit, hookCount: hs.length };
     });
 
     // 数据库说他在场的，直接从候选里剔除（他已经在这个画面里了）
@@ -3747,7 +3762,7 @@ function directorText(res) {
         else L.push('当前场景提到了：' + p.hit.join('、') + '　—— 只有她此刻真的就在那个位置附近，才用这条。');
     }
     else if ((p.scenes || []).length) L.push('她通常在：' + p.scenes.slice(0, 4).join('、') + '（场景对得上才用）。');
-    if (p.hint) L.push('她的出场方式：' + p.hint.slice(0, 90));
+    if (p.hint) L.push('她的出场方式：' + p.hint.slice(0, 90) + '（按你这一段的行文写，不必逐字照搬）');
     if (p.strength === 'strong') {
         L.push('这一轮请让她出现在场景里。她已经很久没露面，这次登场合情合理。');
         L.push('除非和当前正在发生的事直接矛盾（比如人都已经离开了这个地点），否则不要跳过这条。');
