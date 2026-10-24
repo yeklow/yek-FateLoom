@@ -3541,7 +3541,7 @@ async function refreshDirCache(forBook) {
         ch.enabled = (picks[ch.name] !== undefined) ? !!picks[ch.name] : !ch.npc;
     }
 
-    state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, rosterFound: rosterFound, npcSkipped: 0, at: Date.now() };
+    state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, rosterFound: rosterFound, npcSkipped: 0, noScenes: chars.filter(function (c) { return !(c.scenes || []).length; }).length, at: Date.now() };
     // 自动兜底：一个角色都没认出来，说明命名完全不合规范 —— 让模型读一遍条目
     const sc0 = (settings().dirScan || {})[book];
     const scanHashNow = (function () {
@@ -3619,9 +3619,21 @@ function directorPick() {
                 if (texts[i].indexOf(c.name) >= 0) { last = i; break; }
             }
         }
-        const gap = last < 0 ? n : (n - 1 - last);
+        const never = (last < 0);
+        // 从没出场过的人不存在「间隔」概念，一律当作最久没出场（否则短聊天里永远轮不到新人）
+        const gap = never ? 9999 : (n - 1 - last);
         const sceneHit = (c.scenes || []).filter(function (w) { return w && recent.indexOf(w) >= 0; });
-        return { name: c.name, hint: c.hint, gap: gap, last: last, hit: sceneHit, scenes: c.scenes || [] };
+        // 没有场景词的角色（手写条目常见），退回用她条目的关键词判断
+        // 关键词本来就带上下文意味（补习 / 健身房 / 值班），比什么都不做强
+        let kwHit = [];
+        if (!sceneHit.length) {
+            const kw = (c.keys || []).map(String).filter(function (k) {
+                return k && k !== c.name && k.length >= 2 && c.name.indexOf(k) < 0 && k.indexOf(c.name) < 0;
+            });
+            kwHit = kw.filter(function (k) { return recent.indexOf(k) >= 0; });
+        }
+        const hit = sceneHit.length ? sceneHit : kwHit;
+        return { name: c.name, hint: c.hint, gap: gap, last: last, never: never, hit: hit, scenes: c.scenes || [], kwHit: kwHit };
     });
 
     // 数据库说他在场的，直接从候选里剔除（他已经在这个画面里了）
@@ -3630,7 +3642,9 @@ function directorPick() {
     const eligible = eligible0.filter(function (r) { return r.gap >= gapNeed; });
     // 严格按间隔门槛：没到门槛的人一律不进候选（否则刚出现过的人会被反复推荐）
     const pool = eligible;
-    if (!pool.length) return { skip: true, why: '所有人都在间隔门槛内，这一轮不推荐', all: rows };
+    if (!pool.length) {
+        return { skip: true, why: '所有人都在间隔门槛内（' + gapNeed + ' 楼），这一轮不推荐', all: rows };
+    }
 
     // 场景命中优先；命中里挑间隔最大的
     const matched = pool.filter(function (r) { return r.hit.length > 0; });
@@ -3640,6 +3654,15 @@ function directorPick() {
     if (matched.length) {
         // 场景真的有对上的人：从命中里挑间隔最大的
         pick = matched.sort(function (a, b) { return b.hit.length - a.hit.length || b.gap - a.gap; })[0];
+    } else if (s.directorNewbie && pool.some(function (r) { return r.never; })) {
+        // 用户开了「允许新人硬上」：从没出场过的人里挑一个关键词最多的
+        const newbies = pool.filter(function (r) { return r.never; });
+        const far2 = function (n) { const d = dbOf(n); return !!(d && d.place && dbPlace && d.place !== dbPlace); };
+        const near2 = newbies.filter(function (r) { return !far2(r.name); });
+        const base2 = near2.length ? near2 : newbies;
+        pick = base2.sort(function (a, b) {
+            return ((b.scenes || []).length + (b.hit || []).length) - ((a.scenes || []).length + (a.hit || []).length) || b.gap - a.gap;
+        })[0];
     } else if (chance > 0 && Math.random() * 100 < chance) {
         // 用户明确开了「随机偶遇」才硬插，并且只从最久没出场的人里挑
         const far = function (n) { const d = dbOf(n); return !!(d && d.place && dbPlace && d.place !== dbPlace); };
@@ -3846,6 +3869,10 @@ function viewDirector() {
         '<option value="before"' + (s.directorPos === 'before' ? ' selected' : '') + '>主提示词之前</option>' +
         '</select></div>';
     h += '</div>';
+    h += '<div class="ac-f"><label>允许新人硬上</label>' +
+        '<label class="ac-sw"><input type="checkbox" id="ac-dir-newbie"' + (s.directorNewbie ? ' checked' : '') + ' /><span>开了才推</span></label>' +
+        '<div class="hint"><b>默认关。</b>关着时，从没出场过的人只有在她条目关键词出现在正文里才会被推荐。' +
+        '打开后，实在没人对得上时会推一个还从没出场的人 —— 提示里仍然写着「突兀就忽略」，由模型判断。</div></div>';
     h += '<div class="ac-f" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:660px">' +
         '<label style="margin:0">只在空闲场景出手</label>' +
         '<label class="ac-sw"><input type="checkbox" id="ac-dir-idle"' + (s.directorIdleOnly ? ' checked' : '') + ' /><span></span></label>' +
@@ -3888,7 +3915,7 @@ function viewDirector() {
         '<button class="ac-btn" id="ac-pick-addbtn">添加</button>' +
         '</div>' +
         ((settings().directorCharsExtra || []).length ? '<div class="hint" style="margin-bottom:8px">已手动添加：' + (settings().directorCharsExtra || []).map(function (x) { return esc(x) + ' <a href="#" data-delname="' + esc(x) + '" style="color:#e08">×</a>'; }).join('、') + '</div>' : '') +
-        '<div class="hint" id="ac-pick-msg" style="margin-bottom:8px">自动认不出来的人，在这里手填。' +
+        (cache && cache.noScenes ? '<div class="hint" style="color:#ffd479;margin-bottom:8px">有 ' + cache.noScenes + ' 个角色没有场景词（手写条目常见），' +            '导演只能用她条目的关键词来判断该不该出场。想更准可以给她们补一段「介入机会」。' +            '<a href="#" id="ac-fix-jump" style="color:#8fd9b6">去一键修复</a></div>' : '') +        '<div class="hint" id="ac-pick-msg" style="margin-bottom:8px">自动认不出来的人，在这里手填。' +
         '填完会按名字去世界书里找她的条目（包含匹配，所以填「柳玉」能找到「柳玉性格补充」）。</div>' +
         '<div style="max-height:300px;overflow:auto">' +
         allChars.map(function (c) {
@@ -4334,7 +4361,7 @@ function dirStatusHtml() {
     return '<div style="padding:10px 12px;line-height:1.7">' +
         '<div><b style="color:' + color + '">' + esc(last.name) + '</b>' +
         '<span style="font-size:11px;color:#6f8080;margin-left:6px">' + kind + '</span></div>' +
-        (last.gap ? '<div style="font-size:11px;color:#6f8080">已经 ' + last.gap + ' 楼没出场</div>' : '') +
+        (last.never ? '<div style="font-size:11px;color:#6f8080">还从没出场过</div>' : (last.gap ? '<div style="font-size:11px;color:#6f8080">已经 ' + last.gap + ' 楼没出场</div>' : '')) +
         '</div>';
 }
 
