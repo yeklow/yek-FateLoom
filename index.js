@@ -4463,6 +4463,11 @@ function watchCharacter() {
 // 导演状态显示：这一轮安排了谁
 function dirStatusHtml() {
     const last = state.dirLast;
+    const pinNow = (settings().directorMode === 'pin' && settings().directorPin) ? String(settings().directorPin) : '';
+    if (pinNow) return '<div style="padding:10px 12px;line-height:1.7">' +
+        '<div><b style="color:#ffd479">' + esc(pinNow) + '</b>' +
+        '<span style="font-size:11px;color:#6f8080;margin-left:6px">已指定，等合适时机</span></div>' +
+        '<div style="font-size:11px;color:#6f8080">她够久没出场、当前场景不激烈时就会推她出场</div></div>';
     if (!last) {
         return '<div class="mini-e" style="padding:10px 12px">这一轮导演还没出手。<br>点「预测」看看它打算怎么安排。</div>';
     }
@@ -4577,10 +4582,33 @@ async function renderMini(needCache) {
     list.innerHTML = chars.map(function (c) {
         const chk = c.enabled !== false ? " checked" : "";
         const tag = c.npc ? "数据库" : (c.source || "");
-        return '<label class="mini-r"><input type="checkbox" data-mpick="' + esc(c.name) + '"' + chk + ' />' +
-            '<span class="mini-n">' + esc(c.name) + '</span>' +
+        const pinned = (settings().directorPin === c.name && settings().directorMode === 'pin');
+        return '<div class="mini-r">' +
+            '<input type="checkbox" data-mpick="' + esc(c.name) + '"' + chk + ' />' +
+            '<span class="mini-n" style="' + (pinned ? 'color:#ffd479' : '') + '">' + esc(c.name) + (pinned ? ' ★' : '') + '</span>' +
+            '<button class="mini-pin" data-pin="' + esc(c.name) + '" title="' + (pinned ? '取消指定' : '指定她优先出场') + '">' + (pinned ? '取消' : '指定') + '</button>' +
+            '<span class="mini-t">' + esc(tag) + '</span></div>';
             '<span class="mini-t">' + esc(tag) + '</span></label>';
     }).join("");
+    list.querySelectorAll('[data-pin]').forEach(function (btn) {
+        btn.addEventListener('click', async function (e) {
+            e.preventDefault();
+            const st = settings();
+            const nm = btn.dataset.pin;
+            if (st.directorPin === nm && st.directorMode === 'pin') {
+                st.directorPin = '';
+                st.directorMode = 'scene';
+                toast('取消指定', null, 2500);
+            } else {
+                st.directorPin = nm;
+                st.directorMode = 'pin';
+                toast('已指定「' + nm + '」优先出场：她够久没出现、场景又不激烈时就会推她', null, 5000);
+            }
+            persist();
+            renderMini(false);
+            if (state.tab === 'director') render();
+        });
+    });
     list.querySelectorAll("[data-mpick]").forEach(function (box) {
         box.addEventListener("change", async function () {
             const st = settings();

@@ -355,3 +355,11 @@
   display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid #2f3739; background: #1a2022;
 }
 #ac-mini-body .mini-f .ac-btn { flex: 1 1 auto; padding: 7px 8px; font-size: 12px; }
+/* 小面板里每行的「指定」按钮 */
+#ac-mini-body .mini-pin {
+  background: #2f3739; border: 0; color: #9fb0b0; cursor: pointer;
+  font-size: 11px; padding: 2px 7px; border-radius: 5px; line-height: 1.5;
+  margin: 0 6px; flex: 0 0 auto;
+}
+#ac-mini-body .mini-pin:hover { background: #3d4749; color: #dfe6e6; }
+#ac-mini-body .mini-r { display: flex; align-items: center; gap: 6px; }
