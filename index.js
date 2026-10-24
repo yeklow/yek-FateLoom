@@ -6,7 +6,10 @@ import { getContext } from '../../../extensions.js';
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const ctx = getContext();
+const ctx = getContext();   // 事件源之类不会变的东西用这个
+// 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
+// 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
+const live = function () { try { return getContext(); } catch (e) { return ctx; } };
 const CORE_NAMES = ['人物关系速览', '地图指南', '{{user}}', '行动路线', '世界观', '故事基调'];
 const NL2 = String.fromCharCode(10, 10);
 
@@ -592,7 +595,7 @@ const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g,
 // 当前角色卡绑定的世界书
 function boundBook() {
     try {
-        const ch = ctx.characters && ctx.characters[ctx.characterId];
+        const _lc = live(); const ch = _lc.characters && _lc.characters[_lc.characterId];
         const w = ch && ch.data && ch.data.extensions && ch.data.extensions.world;
         return w ? String(w) : '';
     } catch (e) { return ''; }
@@ -856,7 +859,7 @@ function xpRule(xps) {
     ].join(String.fromCharCode(10));
 }
 function chatPool(depth) {
-    const chat = ctx.chat || [];
+    const chat = live().chat || [];
     const d = Number(depth === undefined ? settings().scanDepth : depth);
     if (!d || d <= 0) return chat;
     return chat.slice(-d);
@@ -866,7 +869,7 @@ function chatPool(depth) {
 function chatKey() {
     try {
         if (typeof ctx.getCurrentChatId === 'function') return String(ctx.getCurrentChatId() || 'default');
-        if (ctx.chatId) return String(ctx.chatId);
+        const _lc2 = live(); if (_lc2.chatId) return String(_lc2.chatId);
     } catch (e) { /* ignore */ }
     return 'default';
 }
@@ -875,7 +878,7 @@ function chatKey() {
 // 自动从上次的位置补扫，避免漏掉中间出现的人物。
 function detectPool() {
     const s = settings();
-    const chat = ctx.chat || [];
+    const chat = live().chat || [];
     const len = chat.length;
     const depth = Number(s.detectDepth) || 8;
     const mark = Number((s.detectMarks || {})[chatKey()]) || 0;
@@ -891,7 +894,7 @@ function detectPool() {
 function markDetect() {
     const s = settings();
     s.detectMarks = s.detectMarks || {};
-    s.detectMarks[chatKey()] = (ctx.chat || []).length;
+    s.detectMarks[chatKey()] = (live().chat || []).length;
     persist();
 }
 function gatherFromChat(name, aliases) {
@@ -910,7 +913,7 @@ function gatherFromChat(name, aliases) {
     return out;
 }
 function gatherFromChar() {
-    const ch = ctx.characters?.[ctx.characterId];
+    const _lc3 = live(); const ch = _lc3.characters?.[_lc3.characterId];
     if (!ch) return null;
     const cb = ch.data?.character_book?.entries || [];
     const lines = [
@@ -952,7 +955,7 @@ async function detectCandidates(force) {
         let useBook = book;
         if (!useBook) {
             try {
-                const ch = ctx.characters && ctx.characters[ctx.characterId];
+                const _lc = live(); const ch = _lc.characters && _lc.characters[_lc.characterId];
                 const w = ch && ch.data && ch.data.extensions && ch.data.extensions.world;
                 if (w) { useBook = w; console.log('[命运织机] 没选目标书，自动使用角色卡绑定的：' + w); }
             } catch (e) { /* ignore */ }
@@ -972,9 +975,9 @@ async function detectCandidates(force) {
         }
         // 当前角色卡和 persona 也算已有
         try {
-            const ch = ctx.characters && ctx.characters[ctx.characterId];
+            const _lc = live(); const ch = _lc.characters && _lc.characters[_lc.characterId];
             if (ch && ch.name) state.existingNames.add(String(ch.name));
-            if (ctx.name2) state.existingNames.add(String(ctx.name2));
+            const _lc4 = live(); if (_lc4.name2) state.existingNames.add(String(_lc4.name2));
         } catch (e) { /* ignore */ }
         for (const dr of (state.drafts || [])) if (dr.name) state.existingNames.add(String(dr.name));
         const existing = [...state.existingNames].slice(0, 200).join('、');
@@ -2417,8 +2420,8 @@ async function refreshOverview() {
     try {
         const books = await listBooks();
         state.books = books;
-        const ch = ctx.characters?.[ctx.characterId];
-        const msgCount = (ctx.chat || []).length;
+        const _lc3 = live(); const ch = _lc3.characters?.[_lc3.characterId];
+        const msgCount = (live().chat || []).length;
         $('ac-stat').innerHTML =
             `<div><div class="k">世界书</div><div class="v">${books.length}</div></div>
              <div><div class="k">聊天消息</div><div class="v">${msgCount}</div></div>
@@ -3801,8 +3804,8 @@ let lastCharKey = null;
 
 function currentCharKey() {
     try {
-        const id = ctx.characterId == null ? "" : String(ctx.characterId);
-        const ch = ctx.characters && ctx.characters[ctx.characterId];
+        const _lc5 = live(); const id = _lc5.characterId == null ? "" : String(_lc5.characterId);
+        const _lc = live(); const ch = _lc.characters && _lc.characters[_lc.characterId];
         return id + "|" + String((ch && ch.name) || "") + "|" + boundBook();
     } catch (e) { return ""; }
 }
@@ -3810,7 +3813,7 @@ function currentCharKey() {
 async function onCharacterSwitched() {
     const s = settings();
     const book = boundBook();
-    const ch = ctx.characters && ctx.characters[ctx.characterId];
+    const _lc = live(); const ch = _lc.characters && _lc.characters[_lc.characterId];
     const cname = (ch && ch.name) || "";
 
     // 跟随角色卡：把它绑定的世界书设为当前目标
