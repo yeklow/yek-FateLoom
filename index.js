@@ -2096,7 +2096,7 @@ async function generatePlan(opt) {
         '【六条核心条目当前内容】', coreInfo, '',
         xpRule(xps),
         genderRule(),
-        '【字数要求】三条都要写足：角色卡 ' + LEN.char[0] + '~' + LEN.char[1] + ' 字，NSFW档案 ' + LEN.nsfw[0] + '~' + LEN.nsfw[1] + ' 字，行为落地指南 ' + LEN.guide[0] + '~' + LEN.guide[1] + ' 字（按中文字符计）。',
+        '【字数要求】三条都要写足：角色卡 ' + LEN.char[0] + '~' + LEN.char[1] + ' 字，身体配置 ' + LEN.body[0] + '~' + LEN.body[1] + ' 字，性癖档案 ' + LEN.sex[0] + '~' + LEN.sex[1] + ' 字，行为落地指南 ' + LEN.guide[0] + '~' + LEN.guide[1] + ' 字（按中文字符计）。',
         '低于下限说明内容太薄，要补细节；超过上限要压缩。宁可具体，不要空话。',
         existingEntries.length ? ('【该角色在世界书里的现有设定（请在此基础上更新，不要推翻和正文一致的部分）】\n' +
             existingEntries.map(function (e) { return '### ' + e.comment + '\n' + String(e.content || '').slice(0, 3000); }).join('\n\n')) : '',
