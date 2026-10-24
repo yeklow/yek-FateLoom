@@ -3463,14 +3463,16 @@ async function refreshDirCache(forBook) {
             }
         }
         // 收集她所有条目的关键词（用于确保注入的这个词真能触发扫描）
+        // 收集她所有条目的关键词（用于确保注入的这个词真能触发扫描）
+        // 用和列表页同一套归属判断，不然手写条目（柳玉 / 柳玉性格补充）会一个关键词都收不到
         const myKeys = [];
         const scanHit = llmNames.get(n);
         const scanEntries = scanHit ? (scanHit.entries || []) : [];
-        for (const e of vals) {
-            const c3 = String(e.comment || '');
-            if (scanEntries.indexOf(c3) >= 0 || c3 === '角色卡 ' + n || c3 === '身体配置 ' + n || c3 === '性癖档案 ' + n || c3 === 'NSFW档案 ' + n || c3 === n + '_行为落地指南' || c3 === n + '_出场时机') {
-                for (const k3 of (e.key || [])) if (k3) myKeys.push(String(k3));
-            }
+        for (const e2 of vals) {
+            const c3 = String(e2.comment || "");
+            if (!c3 || /^(TavernDB|ACU-)/i.test(c3)) continue;
+            if (scanEntries.indexOf(c3) < 0 && !entryBelongsTo(c3, n)) continue;
+            for (const k3 of (e2.key || [])) if (k3) myKeys.push(String(k3));
         }
         // 从她的角色卡里读关系：谁认识她、主角认不认识她
         let relList = [];
@@ -3581,6 +3583,19 @@ async function refreshDirCache(forBook) {
     const picks = settings().directorPick || {};
     for (const ch of chars) {
         ch.enabled = (picks[ch.name] !== undefined) ? !!picks[ch.name] : !ch.npc;
+    }
+
+    // 卡片里没写关系的话，用数据库记的关系补上（手写条目常见）
+    for (const ch of chars) {
+        if ((ch.relations || []).length) continue;
+        const nm5 = ch.name;
+        let d5 = dbCast[nm5];
+        if (!d5) {
+            for (const k5 of Object.keys(dbCast)) {
+                if (k5 && (k5.indexOf(nm5) >= 0 || nm5.indexOf(k5) >= 0)) { d5 = dbCast[k5]; break; }
+            }
+        }
+        if (d5 && Array.isArray(d5.relations) && d5.relations.length) ch.relations = d5.relations.slice();
     }
 
     state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, rosterFound: rosterFound, npcSkipped: 0, noScenes: chars.filter(function (c) { return !(c.scenes || []).length; }).length, at: Date.now() };
