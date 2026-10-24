@@ -1197,6 +1197,7 @@ function ensurePanel() {
           <div id="ac-side">
             <div class="g">主功能</div>
             <div class="it" data-tab="add">添加角色</div>
+            <div class="it" data-tab="import">导入人物</div>
             <div class="it" data-tab="update">更新角色</div>
             <div class="it" data-tab="director">出场导演</div>
             <div class="it" data-tab="api">API 配置</div>
@@ -1277,6 +1278,7 @@ function renderInner() {
     document.querySelectorAll('#ac-side .it[data-tab]').forEach(it => it.classList.toggle('on', it.dataset.tab === state.tab));
     const m = $('ac-main');
     if (state.tab === 'add') m.innerHTML = viewAdd();
+    if (state.tab === 'import') { m.innerHTML = viewImport(); wireImport(); return; }
     if (state.tab === 'overview') { m.innerHTML = viewOverview(); refreshOverview(); return; }
     if (state.tab === 'backups') { m.innerHTML = viewBackups(); wireBackups(); return; }
     if (state.tab === 'update') {
@@ -1299,6 +1301,51 @@ function renderInner() {
     if (state.tab === 'api') { m.innerHTML = viewApi(); wireApi(); return; }
     if (state.tab === 'prompt') { m.innerHTML = viewPrompt(); wirePrompt(); return; }
     wireAdd();
+}
+
+// ── 导入人物（从别的世界书搬）──────────────────────
+function viewImport() {
+    const s = settings();
+    const info = state.importInfo;
+    const target = effectiveBook();
+    const books = (state.books || []).filter(function (b) { return b && b !== target; });
+    const impHtml = (function () {
+    let h = '<div class="ac-card"><div class="h">从别的世界书导入人物</div>' +
+            '<div class="hint" style="margin-bottom:10px">把另一本世界书里的人物搬到当前这本书。' +
+            '每个人生成一套织机格式的新条目，原书不动。</div>' +
+            '<div class="ac-f"><label>来源世界书</label><select id="ac-imp-book">' +
+            '<option value="">（选一本书）</option>' +
+            books.map(function (b) {
+                const sel = (info && info.book === b) ? ' selected' : '';
+                return '<option value="' + esc(b) + '"' + sel + '>' + esc(b) + '</option>';
+            }).join('') +
+            '</select></div>' +
+            '<button class="ac-btn" id="ac-imp-scan">读取人物</button>';
+        h += '<label class="ac-sw" style="margin-top:10px"><input type="checkbox" id="ac-imp-review"' +
+            (settings().importReview ? ' checked' : '') + ' /><span>生成后先放进草稿，让我看过再写</span></label>' +
+            '<div class="hint">勾上：每人生成完停在页面顶部的草稿区，逐个确认后再写。' +
+            '不勾：直接写入（都记了操作日志，可在「备份」页撤回）。</div>';
+        if (info) {
+            const pend = (info.chars || []).filter(function (x2) { return !x2.exists; });
+            h += '<div class="hint" style="margin-top:10px">「' + esc(info.book) + '」里有 ' + (info.chars || []).length + ' 个角色，其中 ' + pend.length + ' 个当前书里没有。</div>';
+            if (!(info.chars || []).length) h += '<div class="ac-warn">这本书里没认出角色。换个命名规范的，或先用「一键修复」统一条目名。</div>';
+            h += (info.chars || []).map(function (x2) {
+                const on = (state.importPick || {})[x2.name] !== false && !x2.exists;
+                return '<label class="ac-row" style="gap:8px;cursor:pointer"><input type="checkbox" data-imp="' + esc(x2.name) + '"' + (on ? ' checked' : '') + (x2.exists ? ' disabled' : '') + ' />' +
+                    '<span class="c">' + esc(x2.name) + (x2.exists ? ' <span class="tag">已有</span>' : '') + '</span>' +
+                    '<span class="n">' + x2.count + ' 条 · ' + x2.chars + ' 字</span></label>';
+            }).join('');
+            if (pend.length) h += '<div style="margin-top:10px"><button class="ac-btn pri" id="ac-imp-run">全部生成并写入（' + pend.length + ' 人）</button></div>';
+        }
+        return h + '</div>';
+    })();
+
+    let out = '<h2>导入人物</h2>';
+    out += '<div class="ac-card"><div class="hint">把另一本世界书里的人物搬到当前世界书：' +
+        '以她在原书里的条目为素材，生成一套织机格式的新条目。<b>原书不动</b>。' +
+        '<br>这是「批量搬人」，和「添加角色」页的「从正文提取一个人」是两件事。</div>' +
+        '<div class="hint" style="margin-top:8px">当前写入目标：<b>' + esc(effectiveBook() || '(未选)') + '</b></div></div>';
+    return out + impHtml;
 }
 
 function viewAdd() {
@@ -1350,39 +1397,6 @@ const xpHtml = (function () {
         h += '<button class="ac-btn" id="ac-xpclear" style="margin-top:8px;">清空</button>';
         h += '</details>';
         return h;
-    })();
-    const impHtml = (function () {
-        const info = state.importInfo;
-        const target = effectiveBook();
-        const books = (state.books || []).filter(function (b) { return b && b !== target; });
-        let h = '<div class="ac-card"><div class="h">从别的世界书导入人物</div>' +
-            '<div class="hint" style="margin-bottom:10px">把另一本世界书里的人物搬到当前这本书。' +
-            '每个人生成一套织机格式的新条目，原书不动。</div>' +
-            '<div class="ac-f"><label>来源世界书</label><select id="ac-imp-book">' +
-            '<option value="">（选一本书）</option>' +
-            books.map(function (b) {
-                const sel = (info && info.book === b) ? ' selected' : '';
-                return '<option value="' + esc(b) + '"' + sel + '>' + esc(b) + '</option>';
-            }).join('') +
-            '</select></div>' +
-            '<button class="ac-btn" id="ac-imp-scan">读取人物</button>';
-        h += '<label class="ac-sw" style="margin-top:10px"><input type="checkbox" id="ac-imp-review"' +
-            (settings().importReview ? ' checked' : '') + ' /><span>生成后先放进草稿，让我看过再写</span></label>' +
-            '<div class="hint">勾上：每人生成完停在页面顶部的草稿区，逐个确认后再写。' +
-            '不勾：直接写入（都记了操作日志，可在「备份」页撤回）。</div>';
-        if (info) {
-            const pend = (info.chars || []).filter(function (x2) { return !x2.exists; });
-            h += '<div class="hint" style="margin-top:10px">「' + esc(info.book) + '」里有 ' + (info.chars || []).length + ' 个角色，其中 ' + pend.length + ' 个当前书里没有。</div>';
-            if (!(info.chars || []).length) h += '<div class="ac-warn">这本书里没认出角色。换个命名规范的，或先用「一键修复」统一条目名。</div>';
-            h += (info.chars || []).map(function (x2) {
-                const on = (state.importPick || {})[x2.name] !== false && !x2.exists;
-                return '<label class="ac-row" style="gap:8px;cursor:pointer"><input type="checkbox" data-imp="' + esc(x2.name) + '"' + (on ? ' checked' : '') + (x2.exists ? ' disabled' : '') + ' />' +
-                    '<span class="c">' + esc(x2.name) + (x2.exists ? ' <span class="tag">已有</span>' : '') + '</span>' +
-                    '<span class="n">' + x2.count + ' 条 · ' + x2.chars + ' 字</span></label>';
-            }).join('');
-            if (pend.length) h += '<div style="margin-top:10px"><button class="ac-btn pri" id="ac-imp-run">全部生成并写入（' + pend.length + ' 人）</button></div>';
-        }
-        return h + '</div>';
     })();
     return `
       <h2>添加角色</h2>
@@ -1458,8 +1472,6 @@ const xpHtml = (function () {
         </div>
         ${xpHtml}
 
-        ${impHtml}
-
         <button class="ac-btn pri big" id="ac-analyze"><i class="fa-solid fa-wand-magic-sparkles"></i> 分析（先预览，不写入）</button>
         <div class="ac-msg" id="ac-msg"></div>
       </div>
@@ -1467,7 +1479,8 @@ const xpHtml = (function () {
       <div id="ac-result"></div>`;
 }
 
-function wireAdd() {
+// 导入人物页的绑定
+function wireImport() {
     // 从别的角色卡导入
     $('ac-imp-review')?.addEventListener('change', function (e) {
         settings().importReview = !!e.target.checked;
@@ -1514,6 +1527,9 @@ function wireAdd() {
             prog.acDone('导入失败：' + errBrief(e), 8000);
         } finally { progNote = function () {}; }
     });
+}
+
+function wireAdd() {
 
     const s = settings();
     $('ac-seg')?.querySelectorAll('[data-src]').forEach(d => d.addEventListener('click', () => {
