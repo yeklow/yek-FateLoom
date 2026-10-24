@@ -3822,7 +3822,8 @@ function directorText(res) {
         L.push('如果实在接不上，就跳过本提示。');
     } else if (p.strength === 'strong') {
         L.push('这一轮请让她出现在这一段里。她怎么出场、先做了什么、说了什么，按她的人设和你这一段的行文自然写，不要照搬任何固定句式。');
-        L.push('如果现在这段正在发生的事不适合她进来（比如正在亲密、正在打斗、正在情绪爆点），就不要让她出现 —— 跳过本提示，下一轮还有机会。');
+        L.push('如果现在不适合她本人进来（正在亲密、正在打斗、正在情绪爆点），可以退一步：让在场的某个人自然地提她一句，或者出现一件和她有关的东西。一句话带过，别像在念设定。');
+        L.push('退不了就跳过本提示，下一轮还有机会。');
         if (p.forced) L.push('本轮回复里必须出现「' + p.name + '」的动作或对话，不能只在旁白里提一下名字。');
     } else {
         L.push('她可以出现在这一段，也可以不出现 —— 你觉得自然就让她进，觉得突兀就忽略本提示。');
@@ -3847,25 +3848,6 @@ function presenceNeedsSpeaker(s) {
     if (/短信|消息|便签|字条|电话|微信|群|快递|留言|来路不明/.test(str)) return null;   // 通讯/物件类
     const m = str.match(/^([^\s「」『』]{2,7}?)(说|提到|提起|转述|抱怨|问|告诉|聊|一句)[「"『]/);
     return m ? m[1] : null;   // 返回说话人，需要他在场
-}
-// 轻提：不让她出场，只让世界记得她
-function directorMildText(p) {
-    const L = [];
-    // 名字放在开头括号里：既能被世界书扫描看到，又不打断阅读
-    L.push('[存在感提示] ' + p.name + '（' + p.gap + ' 楼未出场）' + (p.trig && p.trig !== p.name ? '　关键词：' + p.trig : ''));
-    L.push('这一场不必让她出场。');
-    const sp = p.presenceSpeak || [];
-    const tr = p.presenceTrace || [];
-    if (sp.length) {
-        L.push('如果顺手，可以让在场的' + sp[0].replace(/(说|提到|提起|转述|抱怨|问|告诉|聊|一句)[「"『].*$/, '') + '自然地提一句她 —— 一句带过，别像在念设定。');
-    }
-    if (tr.length) {
-        L.push('（她留下的痕迹：' + tr.slice(0, 3).join('；') + '）');
-    }
-    if (!sp.length && !tr.length) L.push('（一件属于她的东西，或一条她发来的消息）');
-    L.push('不要让不认识她的人提到她，也不要让她本人出现。');
-    L.push('如果连痕迹都不好安排，就完全忽略本提示。');
-    return L.join(String.fromCharCode(10));
 }
 // 每轮生成前调用（同步）
 function runDirector() {
@@ -3914,22 +3896,6 @@ function runDirector() {
         // 二档 / 三档：本地计算
         const res = directorPick();
         if (!res) { clearDirector(); return; }
-
-        // 轻提：不让她出场，只让世界记得她
-        if (res.mild && res.pick) {
-            const cm = ((state.dirCache && state.dirCache.chars) || []).find(function (x) { return x.name === res.pick.name; });
-            res.pick.presenceText = (cm && cm.presence) ? cm.presence : "";
-            res.pick.trig = triggerOf(res.pick.name);
-            const mt = directorMildText(res.pick);
-            ctx.setExtensionPrompt(DIR_KEY, mt, pos, depth, true, 0);
-            try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
-            try { const nmI = (state.dirInject || [])[0] && state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
-            state.dirLast = { at: Date.now(), name: res.pick.name, text: mt, gap: res.pick.gap, by: "mild" };
-    try { renderDirStatus(); } catch (e) {}
-            console.log("[命运织机] 导演轻提：" + res.pick.name + "（" + res.pick.gap + " 楼未出场，只提及不出场）");
-            toastDirector('mild', res.pick.name, res.pick.gap);
-            return;
-        }
 
         if (res.skip || !res.pick) { clearDirector(); return; }
 
