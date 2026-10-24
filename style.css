@@ -368,3 +368,5 @@
   font-size: 11px; color: #7d8f8f; font-weight: 400;
   margin-left: 7px; letter-spacing: 0.3px;
 }
+/* 小面板里的出场频率按钮 */
+#ac-mini-body .mini-freq:hover { filter: brightness(1.15); }

@@ -4486,7 +4486,17 @@ function dirStatusHtml() {
         '上次注入 ' + new Date(inj.at).toLocaleTimeString() + ' · ' + inj.len + ' 字' + (inj.forced ? ' · 强制' : '') +
         (lastText ? '　<span style="color:#8fd9b6">看原文</span>' : '') + '</div>' +
         (lastText ? '<div id="ac-mini-injtext" style="display:none;font-size:11px;color:#9fb0b0;padding:0 12px 10px;white-space:pre-wrap;line-height:1.6">' + esc(lastText) + '</div>' : '')) : '';
-    return dirStatusCore() + injLine;
+    const curEvery = Math.max(1, Number((settings().directorEvery) || 3));
+    const freqRow = '<div style="display:flex;align-items:center;gap:4px;padding:0 12px 10px;flex-wrap:wrap">' +
+        '<span style="font-size:11px;color:#6f8080;margin-right:2px">出场频率</span>' +
+        [1, 2, 3, 5, 8, 15].map(function (v) {
+            const on = (curEvery === v);
+            return '<button class="mini-freq" data-every="' + v + '" style="padding:2px 7px;font-size:11px;border-radius:5px;border:0;cursor:pointer;' +
+                (on ? 'background:#8fd9b6;color:#10201c;font-weight:600' : 'background:#2f3739;color:#9fb0b0') + '">' +
+                (v === 1 ? '每轮' : (v + '楼')) + '</button>';
+        }).join('') +
+        '<span style="font-size:11px;color:#6f8080;margin-left:2px">安排一次</span></div>';
+    return dirStatusCore() + injLine + freqRow;
 }
 
 // 只算不注入：预测这一轮会安排谁
@@ -4546,6 +4556,14 @@ function ensureMini() {
     document.getElementById("ac-mini-open").addEventListener("click", function () {
         document.getElementById("ac-mini-body").style.display = "none";
         openPanel();
+    });
+    document.getElementById('ac-mini-body').addEventListener('click', function (e) {
+        const btn = e.target.closest && e.target.closest('[data-every]');
+        if (!btn) return;
+        settings().directorEvery = Number(btn.dataset.every) || 3;
+        persist();
+        renderDirStatus();
+        toast('出场频率：' + (Number(btn.dataset.every) === 1 ? '每轮都安排' : ('每 ' + btn.dataset.every + ' 楼安排一次')), null, 3000);
     });
     document.getElementById("ac-mini-predict").addEventListener("click", function () {
         const r = previewDirector();
