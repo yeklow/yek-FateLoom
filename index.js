@@ -3726,9 +3726,8 @@ function directorPick() {
             return hb - ha;
         });
         // 前几名里随机挑一个，避免每次都同一个人
-        const topN = sorted2.slice(0, Math.min(3, sorted2.length));
-        const top2 = topN[Math.floor(Math.random() * topN.length)];
-        top2.strength = (top2.hit || []).length ? 'strong' : 'middle';   // 没线索但确实很久没出场，用中等强度
+        // 严格按顺序：谁最久没出现就谁，不随机 —— 出场过就排到队尾，下一个接着上
+        const top2 = sorted2[0];
         return { pick: top2, all: rows, byMode: 'rotate' };
     }
     // 场景命中优先；命中里挑间隔最大的
@@ -3890,6 +3889,7 @@ function runDirector() {
             ].filter(Boolean).join(String.fromCharCode(10));
             ctx.setExtensionPrompt(DIR_KEY, text2, pos, depth, true, 0);
             try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
+            try { const nmI = state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
             state.dirLast = { at: Date.now(), name: sg.name, text: text2, gap: 0, by: "llm" };
     try { renderDirStatus(); } catch (e) {}
             state.dirSuggestion = null;
@@ -3910,6 +3910,7 @@ function runDirector() {
             const mt = directorMildText(res.pick);
             ctx.setExtensionPrompt(DIR_KEY, mt, pos, depth, true, 0);
             try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
+            try { const nmI = state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
             state.dirLast = { at: Date.now(), name: res.pick.name, text: mt, gap: res.pick.gap, by: "mild" };
     try { renderDirStatus(); } catch (e) {}
             console.log("[命运织机] 导演轻提：" + res.pick.name + "（" + res.pick.gap + " 楼未出场，只提及不出场）");
@@ -3925,6 +3926,7 @@ function runDirector() {
         if (!text) { clearDirector(); return; }
         ctx.setExtensionPrompt(DIR_KEY, text, pos, depth, true, 0);
             try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
+            try { const nmI = state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
         state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap, by: "script" };
     try { renderDirStatus(); } catch (e) {}
         console.log("[命运织机] 导演：推荐 " + res.pick.name + "（" + res.pick.gap + " 楼未出场，场景词命中）");
@@ -4067,12 +4069,6 @@ function viewDirector() {
             }).join('') + '</div>' : '') +
         '</div>';
 
-    h += '<div class="ac-card"><div class="h">这一轮的预览</div>' +
-        '<button class="ac-btn pri" id="ac-dir-preview">预览</button>' +
-        '<div class="ac-msg" id="ac-dir-msg"></div>' +
-        (last ? '<div class="hint" style="margin-top:10px">来源：' + (last.by === 'llm' ? '<b style="color:#8fd9b6">模型判断</b>（检测时顺带挑的）' : last.by === 'mild' ? '<b style="color:#7dd3fc">轻提</b>（不出场，只提及）' : '<b style="color:#ffd479">脚本</b>（场景词命中）') + '</div>' +
-            '<div class="ac-view" style="margin-top:8px;max-height:220px">' + esc(last.text) + '</div>' : '') +
-        '</div>';
 
     h += '<div class="ac-card" style="background:#1b2224"><div class="h">一键修复世界书</div>' +
         '<div class="hint">有些角色认不出来，是因为她的条目名不统一，或者名字没写进关键词。' +
@@ -4216,19 +4212,6 @@ function wireDirector() {
         render();
     });
 
-    const pv = $('ac-dir-preview');
-    if (pv) pv.addEventListener('click', function () {
-        const m = $('ac-dir-msg');
-        const res = directorPick();
-        if (!res) { if (m) { m.className = 'ac-msg err'; m.textContent = '还没有素材，先点「重新读取」'; } return; }
-        if (res.skip) { if (m) { m.className = 'ac-msg err'; m.textContent = res.why; } return; }
-        if (!res.pick) { if (m) { m.className = 'ac-msg err'; m.textContent = '没有可推荐的人'; } return; }
-        const text = directorText(res);
-        state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap };
-    try { renderDirStatus(); } catch (e) {}
-        if (m) { m.className = 'ac-msg ok'; m.textContent = '这一轮会推荐：' + res.pick.name; }
-        render();
-    });
 }
 // ── 备份 / 操作记录 ──────────────────────────────
 function viewBackups() {
@@ -4469,15 +4452,13 @@ function watchCharacter() {
 // 主页面浮动小面板：不用每次去开魔杖菜单
 // ═══════════════════════════════════════════════════════════
 // 导演状态显示：这一轮安排了谁
-function dirStatusHtml() {
+function dirStatusCore() {
     const last = state.dirLast;
-    const inj = (state.dirInject || [])[0];
-    const injLine = inj ? ('<div style="font-size:11px;color:#6f8080;margin-top:4px">上次注入 ' + new Date(inj.at).toLocaleTimeString() + ' · ' + inj.len + ' 字' + (inj.forced ? ' · 强制' : '') + '</div>') : '';
     const pinNow = (settings().directorMode === 'pin' && settings().directorPin) ? String(settings().directorPin) : '';
     if (pinNow) return '<div style="padding:10px 12px;line-height:1.7">' +
         '<div><b style="color:#ffd479">' + esc(pinNow) + '</b>' +
         '<span style="font-size:11px;color:#6f8080;margin-left:6px">已指定，等合适时机</span></div>' +
-        '<div style="font-size:11px;color:#6f8080">她够久没出场、当前场景不激烈时就会推她出场</div>' + injLine + '</div>';
+        '<div style="font-size:11px;color:#6f8080">她够久没出场、当前场景不激烈时就会推她出场</div>' + '</div>';
     if (!last) {
         return '<div class="mini-e" style="padding:10px 12px">这一轮导演还没出手。<br>点「预测」看看它打算怎么安排。</div>';
     }
@@ -4492,6 +4473,16 @@ function dirStatusHtml() {
         '<span style="font-size:11px;color:#6f8080;margin-left:6px">' + kind + '</span></div>' +
         (last.never ? '<div style="font-size:11px;color:#6f8080">还从没出场过</div>' : (last.gap ? '<div style="font-size:11px;color:#6f8080">已经 ' + last.gap + ' 楼没出场</div>' : '')) +
         '</div>';
+}
+function dirStatusHtml() {
+    // 「上次注入」这一行所有分支都显示，用来判断导演到底有没有注入
+    const inj = (state.dirInject || [])[0];
+    const lastText = (state.dirLast && state.dirLast.text) ? String(state.dirLast.text) : '';
+    const injLine = inj ? ('<div style="font-size:11px;color:#6f8080;margin-top:6px;padding:0 12px 10px;cursor:pointer" id="ac-mini-inj">' +
+        '上次注入 ' + new Date(inj.at).toLocaleTimeString() + ' · ' + inj.len + ' 字' + (inj.forced ? ' · 强制' : '') +
+        (lastText ? '　<span style="color:#8fd9b6">看原文</span>' : '') + '</div>' +
+        (lastText ? '<div id="ac-mini-injtext" style="display:none;font-size:11px;color:#9fb0b0;padding:0 12px 10px;white-space:pre-wrap;line-height:1.6">' + esc(lastText) + '</div>' : '')) : '';
+    return dirStatusCore() + injLine;
 }
 
 // 只算不注入：预测这一轮会安排谁
