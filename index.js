@@ -3626,6 +3626,25 @@ function msgTexts() {
 }
 
 // 算出这一轮该推荐谁（同步，只用缓存）
+// 这一轮适不适合插人进来
+// 正戏、打斗、情绪高点都不适合 —— 让人凭空出现只会毁气氛
+function sceneBusy(text) {
+    const t2 = String(text || '');
+    if (!t2) return '';
+    // 强信号：出现一个就说明在正戏里
+    const STRONG = /呻吟|娇喘|抽插|肉棒|小穴|菊穴|龟头|阴道|射精|射了|射在|内射|高潮|赤裸|一丝不挂|全裸|裸体|舌吻|爱液|蜜液|淫液|痉挛|挺进|插进|进入了她|进入了他|做爱|性交|自慰|口交|乳交|插入/g;
+    const strongHits = t2.match(STRONG) || [];
+    if (strongHits.length) return '当前在亲密戏里（' + strongHits.slice(0, 3).join('、') + '）';
+    // 弱信号：两个以上才算，避免日常描写误判
+    const WEAK = /喘|湿润|湿透|深处|身下|压上去|压在身上|解开.{0,4}(扣|衣|带)|床单|床上|亲吻|舔|抚摸|顶弄|夹紧|奶子|奶头|脱掉|轻颤|滑进|咬住.{0,3}(唇|嘴)|咬着.{0,3}唇|腰窝|大腿根/g;
+    const weakHits = t2.match(WEAK) || [];
+    if (weakHits.length >= 2) return '当前在亲密戏里（' + weakHits.slice(0, 3).join('、') + '）';
+    if (/战斗|打斗|交手|争吵|怒吼|咆哮|危险|鲜血|受伤|追逐|逃亡|尖叫|对峙|拔刀|开枪/.test(t2)) {
+        return '当前在激烈冲突里';
+    }
+    return '';
+}
+
 function directorPick() {
     const cache = state.dirCache;
     if (!cache || !cache.chars || !cache.chars.length) return null;
@@ -3654,8 +3673,8 @@ function directorPick() {
 
     // 空闲检测：最近一楼是否在打斗/激烈冲突里
     if (s.directorIdleOnly) {
-        const busy = /战斗|打斗|交手|争吵|怒吼|咆哮|危险|鲜血|受伤|追逐|逃亡|尖叫/;
-        if (busy.test(texts[n - 1] || '')) return { skip: true, why: '当前场景在激烈冲突里，不插人' };
+        const whyBusy = sceneBusy(texts.slice(-2).join('\n'));
+        if (whyBusy) return { skip: true, why: whyBusy + '，这一轮不安排任何人出场' };
     }
 
     // 每个人：上次出现楼层（从记录里取，没有就从正文里找最后一次提到）
@@ -3767,8 +3786,8 @@ function directorText(res) {
         L.push('如果实在接不上，就跳过本提示。');
     } else if (p.strength === 'strong') {
         L.push('这一轮请让她出现在这一段里。她怎么出场、先做了什么、说了什么，按她的人设和你这一段的行文自然写，不要照搬任何固定句式。');
-        L.push('除非和正在发生的事直接矛盾（比如人已经离开这个地点），否则不要跳过。');
-        L.push('本轮回复里必须出现「' + p.name + '」的动作或对话，不能只在旁白里提一下名字。');
+        L.push('如果现在这段正在发生的事不适合她进来（比如正在亲密、正在打斗、正在情绪爆点），就不要让她出现 —— 跳过本提示，下一轮还有机会。');
+        if (p.forced) L.push('本轮回复里必须出现「' + p.name + '」的动作或对话，不能只在旁白里提一下名字。');
     } else {
         L.push('她可以出现在这一段，也可以不出现 —— 你觉得自然就让她进，觉得突兀就忽略本提示。');
         L.push('如果让她出现，怎么进场由你决定。');
@@ -3956,10 +3975,10 @@ function viewDirector() {
             '</select><div class="hint">只要她够久没出场、当前又不在激烈冲突里，就会推她。</div></div>';
     }
     h += '<div class="ac-f" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:660px">' +
-        '<label style="margin:0">只在空闲场景出手</label>' +
+        '<label style="margin:0">正戏和打斗时不插人</label>' +
         '<label class="ac-sw"><input type="checkbox" id="ac-dir-idle"' + (s.directorIdleOnly ? ' checked' : '') + ' /><span></span></label>' +
         '</div>';
-    h += '<div class="hint" style="margin-top:4px">最近一楼在打斗、争吵、逃亡这类激烈情节时，不插人。</div>';
+    h += '<div class="hint" style="margin-top:4px">最近两楼里如果有亲密戏或打斗争吵，这一轮完全不安排人出场 —— 正戏中途不会有人凭空进来。</div>';
     h += '<div class="ac-f" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:660px;margin-top:8px">' +
         '<label style="margin:0">动手时弹提示</label>' +
         '<label class="ac-sw"><input type="checkbox" id="ac-dir-notify"' + (s.directorNotify ? ' checked' : '') + ' /><span></span></label>' +
