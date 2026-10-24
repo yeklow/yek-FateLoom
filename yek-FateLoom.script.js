@@ -3506,6 +3506,10 @@ function viewDirector() {
         '<div class="hint">有些角色认不出来，是因为她的条目名不统一，或者名字没写进关键词。' +
         '这里可以批量修好 —— 改的是你自己的世界书，改之前会列出具体改什么。</div>' +
         '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">' +
+        '<select id="ac-fix-style" style="width:auto;flex:0 0 auto;padding:6px 8px">' +
+        '<option value="marker">改成：名字（人设核心）</option>' +
+        '<option value="std">改成：角色卡 名字</option>' +
+        '</select>' +
         '<button class="ac-btn" id="ac-fix-scan">分析一下</button>' +
         '<button class="ac-btn pri" id="ac-fix-apply">执行修复</button>' +
         '<button class="ac-btn" id="ac-fix-undo">撤销上次修复</button>' +
@@ -3725,19 +3729,20 @@ function entryBelongsTo(comment, name) {
 }
 
 // 从条目名推测它该叫什么（推测不出来就返回空）
-function guessStdName(comment, name) {
+function guessStdName(comment, name, style) {
+    const marker = (style === 'marker');
     const c = String(comment || '');
     if (/^(?:角色卡|NSFW档案|身体配置|性癖档案)\s/.test(c)) return '';   // 已经规范了
     if (c === name) return '';                                          // 就是名字本身，不动
     if (!entryBelongsTo(c, name)) return '';
-    if (/瑟瑟|性癖|NSFW|色情/i.test(c)) return '性癖档案 ' + name;
-    if (/身体|肉体|体型|身材/i.test(c)) return '身体配置 ' + name;
-    if (/人设|核心|设定|角色卡/i.test(c)) return '角色卡 ' + name;
+    if (/瑟瑟|性癖|NSFW|色情/i.test(c)) return marker ? (name + '（瑟瑟设定）') : ('性癖档案 ' + name);
+    if (/身体|肉体|体型|身材/i.test(c)) return marker ? (name + '（身体设定）') : ('身体配置 ' + name);
+    if (/人设|核心|设定|角色卡/i.test(c)) return marker ? (name + '（人设核心）') : ('角色卡 ' + name);
     return '';
 }
 
 // 分析：能补哪些关键词、能规范哪些条目名
-async function analyzeBookFix(book) {
+async function analyzeBookFix(book, style) {
     const cache = await refreshDirCache(book);
     const data = await getBook(book);
     const vals = Object.values(data.entries || {});
@@ -3754,7 +3759,7 @@ async function analyzeBookFix(book) {
             if (keys.indexOf(n) < 0) {
                 keyFixes.push({ uid: e.uid, comment: String(e.comment || ''), name: n });
             }
-            const std = guessStdName(String(e.comment || ''), n);
+            const std = guessStdName(String(e.comment || ''), n, style);
             if (std && std !== String(e.comment)) {
                 renames.push({ uid: e.uid, from: String(e.comment || ''), to: std, name: n });
             }
