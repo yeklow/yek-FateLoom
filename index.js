@@ -2666,11 +2666,14 @@ async function viewUpdate() {
     if (state.rewrite) {
         const r = state.rewrite;
         h += '<div class="ac-card"><div class="h">更新预览：' + esc(r.comment) + '</div>' +
-            '<div class="hint">旧 ' + r.old.length + ' 字 → 新 ' + r.neu.length + ' 字</div>' +
+            '<div class="hint">旧 ' + r.oldLen + ' 字 → 新 ' + r.newLen + ' 字（' + Math.round((r.ratio || 1) * 100) + '%）</div>' +
+            (r.short ? '<div class="hint" style="color:#ff7a7a;margin-top:6px">⚠ 新内容只有原文的 ' + Math.round((r.ratio || 1) * 100) + '%，很可能是模型偷懒压缩了。' +
+                '直接写入会丢掉大部分原文。建议先把它补回来，或者点取消。</div>' : '') +
             '<textarea id="ac-rw-text" style="width:100%;height:240px;margin-top:10px">' + esc(r.neu) + '</textarea>' +
             '<div class="hint" style="color:#ffd479;margin-top:8px">⚠ 写入会<b>覆盖这一条的正文</b>。条目名、关键词、顺序都不变；旧的正文会被记下来，可以撤销。</div>' +
             '<div style="display:flex;gap:8px;margin-top:10px">' +
-            '<button class="ac-btn pri" id="ac-rw-apply">写入这条</button>' +
+            '<button class="ac-btn pri" id="ac-rw-apply">' + (r.short ? '仍然写入（会丢内容）' : '写入这条') + '</button>' +
+            '<button class="ac-btn" id="ac-rw-new">另存为新条目</button>' +
             '<button class="ac-btn" id="ac-rw-cancel">取消</button></div></div>';
         h += '<div style="margin-top:8px"><button class="ac-btn" id="ac-rw-undo">撤销上次写入</button></div>';
     }
@@ -2727,7 +2730,8 @@ function wireUpdate() {
     document.querySelectorAll('[data-rewrite]').forEach(function (btn) {
         btn.addEventListener('click', function () { runRewrite(btn.dataset.rewrite); });
     });
-    $('ac-rw-apply')?.addEventListener('click', applyRewrite);
+    $('ac-rw-apply')?.addEventListener('click', function () { applyRewrite('overwrite'); });
+    $('ac-rw-new')?.addEventListener('click', function () { applyRewrite('new'); });
     $('ac-rw-cancel')?.addEventListener('click', function () { state.rewrite = null; render(); });
     $('ac-rw-undo')?.addEventListener('click', async function () {
         const prog = toastProgress('正在撤销…');
@@ -2755,31 +2759,55 @@ async function runRewrite(uid) {
     if (!c) return;
     const ent = (c.entries || []).find(function (e) { return String(e.__uid) === String(uid) || String(e.comment) === String(uid); });
     const target = ent || (c.entries || [])[0];
-    if (!target) { toast('找不到这条条目', null, 4000); return; }
+    if (!target) { toast("找不到这条条目", null, 4000); return; }
 
-    const prog = toastProgress('正在就地更新「' + target.comment + '」…');
+    const oldText = String(target.content || "");
+    const oldLen = oldText.length;
+    const prog = toastProgress("正在就地更新「" + target.comment + "」…");
     try {
-        let chatPart = '';
+        let chatPart = "";
         try {
             const hits = gatherFromChat(c.name, []);
-            if (hits.length) chatPart = NL2 + '【新的正文素材】' + NL2 + hits.slice(-20).map(function (h) { return (h.isUser ? '【玩家】' : '【正文】') + h.text; }).join(NL2).slice(0, 6000);
+            if (hits.length) chatPart = NL2 + "【新的正文素材】" + NL2 + hits.slice(-20).map(function (h) { return (h.isUser ? "【玩家】" : "【正文】") + h.text; }).join(NL2).slice(0, 6000);
         } catch (e) { /* 聊天里没有就用空 */ }
 
-        const prompt = REWRITE_SYSTEM + NL2 + NL2 +
-            '【条目名】' + target.comment + NL2 + NL2 +
-            '【条目原文】' + NL2 + String(target.content || '') + chatPart + NL2 + NL2 +
-            '请输出更新后的这一条正文。';
+        const buildPrompt = function (strict) {
+            return REWRITE_SYSTEM + NL2 + NL2 +
+                "【条目名】" + target.comment + NL2 + NL2 +
+                "【条目原文】" + NL2 + oldText + chatPart + NL2 + NL2 +
+                "【硬性要求】更新后的正文不少于 " + Math.round(oldLen * 0.8) + " 字（原文 " + oldLen + " 字）。" + NL2 +
+                (strict ? "上一条输出太短了，这次必须写满，把原文里仍然成立的内容全部保留下来，只做增补和润色，不要概括、不要压缩、不要删减成要点。" + NL2 : "") +
+                "请输出更新后的这一条正文。";
+        };
 
-        const raw = await callLLM(prompt);
-        let txt = String(raw || '').trim();
-        // 去掉模型可能加的代码围栏/前言
-        txt = txt.replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/, '').trim();
+        const clean1 = function (raw) {
+            let x = String(raw || "").trim();
+            x = x.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/, "").trim();
+            return x;
+        };
 
-        state.rewrite = { uid: target.uid, comment: target.comment, old: String(target.content || ''), neu: txt, take: true };
-        prog.acDone('已生成更新版，确认后写入');
+        // 第一次
+        let txt = clean1(await callLLM(buildPrompt(false)));
+        // 太短就重试一次（原文 2000 字缩成 100 字是灾难，必须先救）
+        if (oldLen > 200 && txt.length < oldLen * 0.6) {
+            prog.acUpdate && prog.acUpdate("输出只有 " + Math.round(txt.length / oldLen * 100) + "%，重试一次…");
+            const retry = clean1(await callLLM(buildPrompt(true)));
+            if (retry.length > txt.length) txt = retry;
+        }
+
+        const ratio = oldLen ? (txt.length / oldLen) : 1;
+        state.rewrite = {
+            uid: target.uid, comment: target.comment,
+            old: oldText, neu: txt, take: true,
+            oldLen: oldLen, newLen: txt.length, ratio: ratio,
+            short: (oldLen > 200 && ratio < 0.6),
+        };
+        prog.acDone(state.rewrite.short
+            ? ("⚠ 输出只有原文的 " + Math.round(ratio * 100) + "%（" + txt.length + "/" + oldLen + " 字），可能丢内容")
+            : ("已生成更新版：" + oldLen + " → " + txt.length + " 字"));
         render();
     } catch (e) {
-        prog.acDone('更新失败：' + (e.message || e), 8000);
+        prog.acDone("更新失败：" + (e.message || e), 8000);
     }
 }
 
@@ -2797,28 +2825,49 @@ async function undoRewrite() {
     return u;
 }
 
-async function applyRewrite() {
+async function applyRewrite(mode) {
     const r = state.rewrite;
     if (!r) return;
     // 用预览框里用户改过的内容（如果有）
-    const box = $('ac-rw-text');
-    if (box && String(box.value || '').trim()) r.neu = String(box.value);
+    const box = $("ac-rw-text");
+    if (box && String(box.value || "").trim()) r.neu = String(box.value);
     const book = effectiveBook();
-    const prog = toastProgress('正在写入…');
+    const prog = toastProgress("正在写入…");
     try {
         const data = await getBook(book);
+        if (mode === "new") {
+            // 另存为新条目，原文不动
+            const ent0 = Object.values(data.entries || {}).find(function (e) { return String(e.uid) === String(r.uid); });
+            let maxUid = 0n;
+            for (const k of Object.keys(data.entries || {})) { try { const b = BigInt(k); if (b > maxUid) maxUid = b; } catch (e) {} }
+            const newUid = String(maxUid + 1n);
+            const src = ent0 || {};
+            data.entries[newUid] = Object.assign({}, src, {
+                uid: newUid,
+                comment: r.comment + "（更新版）",
+                content: r.neu,
+                key: Array.isArray(src.key) ? src.key.slice() : [],
+                displayIndex: Math.max(0, ...Object.values(data.entries || {}).map(function (x) { return Number(x.displayIndex) || 0; })) + 1,
+            });
+            await putBook(book, data);
+            state.rewrite = null;
+            await refreshDirCache();
+            prog.acDone("已另存为「" + r.comment + "（更新版）」，原文未动");
+            render();
+            return;
+        }
         const ent = Object.values(data.entries || {}).find(function (e) { return String(e.uid) === String(r.uid); });
-        if (!ent) throw new Error('这条条目已经不在了');
-        const before = String(ent.content || '');
+        if (!ent) throw new Error("这条条目已经不在了");
+        const before = String(ent.content || "");
         ent.content = r.neu;
-        state.rewriteUndo = { uid: ent.uid, comment: String(ent.comment || ''), old: before, at: Date.now() };
+        state.rewriteUndo = { uid: ent.uid, comment: String(ent.comment || ""), old: before, at: Date.now() };
         await putBook(book, data);
         state.rewrite = null;
         await refreshDirCache();
-        prog.acDone('已更新「' + r.comment + '」');
+        prog.acDone("已更新「" + r.comment + "」");
         render();
     } catch (e) {
-        prog.acDone('写入失败：' + (e.message || e), 8000);
+        prog.acDone("写入失败：" + (e.message || e), 8000);
     }
 }
 // 把现有条目当素材，升级成织机格式（不依赖聊天里出现过她）
