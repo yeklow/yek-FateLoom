@@ -579,6 +579,7 @@ const DEFAULTS = {
     directorNotify: true,     // 导演动手时弹提示
     dirLog: {},               // 每个聊天的出场记录
     directorCharsExtra: [],   // 手动补充的角色名（任何命名规范都能用）
+    directorIncludeNpc: false, // 把数据库里的次要 NPC 也算进来
     dirScan: {},              // LLM 扫世界书的缓存（按书 + 指纹）
 
 };
@@ -3077,15 +3078,18 @@ async function refreshDirCache() {
 
     // 数据库里有、我们这边没有的，也要能推荐（否则像秦丽这种人永远出不来）
     const have = new Set(chars.map(function (c) { return c.name; }));
+    const npcPool = [];
     for (const n of Object.keys(dbCast)) {
         if (have.has(n)) continue;
         let dup = false;
         for (const h of have) { if (h.indexOf(n) >= 0 || n.indexOf(h) >= 0) { dup = true; break; } }
         if (dup) continue;
-        chars.push({ name: n, scenes: [], hint: '', dbOnly: true });
+        npcPool.push({ name: n, scenes: [], hint: '', dbOnly: true, npc: true });
     }
+    // 数据库里的次要 NPC：只有打开开关才纳入（默认只推荐主要角色）
+    if (settings().directorIncludeNpc) chars.push.apply(chars, npcPool);
 
-    state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, at: Date.now() };
+    state.dirCache = { book: book, chars: chars, dbCast: dbCast, dbPlace: dbPlace, npcSkipped: settings().directorIncludeNpc ? 0 : npcPool.length, at: Date.now() };
     return state.dirCache;
 }
 
@@ -3380,6 +3384,11 @@ function viewDirector() {
                 (present.length ? '（' + esc(present.join('、')) + '）' : '') + '<br>' +
                 '在场的人不会被推荐出场，在别处的人会降低优先级。</div>';
         })() +
+        '<div class="ac-sw" style="margin-top:12px"><input type="checkbox" id="ac-dir-npc"' + (s.directorIncludeNpc ? ' checked' : '') + ' /><span>把数据库里的次要 NPC 也纳入</span></div>' +
+        '<div class="hint" style="margin-top:4px">默认只推荐主要角色（人物关系速览 / 角色卡 / LLM 认出来的）。' +
+        '数据库中那些没进关系速览的人（例如某人的父亲、路人甲）不会出现在名单里。' +
+        (state.dirCache && state.dirCache.npcSkipped ? '目前排除了 <b>' + state.dirCache.npcSkipped + '</b> 个。' : '') + '</div>' +
+
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
         '<button class="ac-btn" id="ac-dir-refresh">重新读取</button>' +
         '<button class="ac-btn pri" id="ac-dir-scan">LLM 扫描角色</button>' +
@@ -3441,6 +3450,14 @@ function wireDirector() {
     if (ntf) ntf.addEventListener('change', function () { settings().directorNotify = ntf.checked; persist(); });
     const idle = $('ac-dir-idle');
     if (idle) idle.addEventListener('change', function () { settings().directorIdleOnly = idle.checked; persist(); });
+
+    const npcSw = $('ac-dir-npc');
+    if (npcSw) npcSw.addEventListener('change', async function () {
+        settings().directorIncludeNpc = !!npcSw.checked;
+        persist();
+        await refreshDirCache();
+        render();
+    });
 
     const btnScan = $('ac-dir-scan');
     if (btnScan) btnScan.addEventListener('click', async function () {
