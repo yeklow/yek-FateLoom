@@ -1681,6 +1681,15 @@ function toastDirector(kind, name, gap, text) {
     if (d) d.textContent = name + '（' + gap + ' 楼未出场）' + (kind === 'mild' ? ' —— 只提及，不出场' : ' —— 已让 AI 考虑让她登场');
 }
 // 进行中提示：不自动消失，由调用方结束
+const TOAST_RECENT = new Map();
+function toastDeduped(text) {
+    const now = Date.now();
+    const at = TOAST_RECENT.get(text) || 0;
+    if (now - at < 20000) return false;
+    TOAST_RECENT.set(text, now);
+    if (TOAST_RECENT.size > 50) TOAST_RECENT.clear();
+    return true;
+}
 function toastProgress(text, onView) {
     const el = toast(text, onView, 0);
     el.acSpin(true);
@@ -3604,18 +3613,21 @@ async function refreshDirCache(forBook) {
     const scanHashNow = (function () {
         try { return scanHash(vals); } catch (e) { return ""; }
     })();
+    state.autoScanTried = state.autoScanTried || {};
     if (settings().autoScan !== false
+        && !state.autoScanTried[scanHashNow]
         && !chars.length
         && !state.autoScanBusy
         && !(state.autoScanFailed && state.autoScanFailed[scanHashNow])
         && String(settings().apiKey || "").trim()
         && !(sc0 && sc0.hash === scanHashNow)) {
         state.autoScanBusy = true;
+        state.autoScanTried[scanHashNow] = true;   // 这个版本的书只自动试一次
         console.log("[命运织机] 规则认不出任何角色，自动调用 LLM 扫描…");
         const prog = (typeof toastProgress === "function") ? toastProgress("认不出角色，正在让模型扫一遍这本书…") : null;
         llmScanCharacters(false).then(function () {
             state.autoScanBusy = false;
-            if (prog) prog.acDone("模型扫描完成");
+            if (prog) prog.acDone(toastDeduped('模型扫描完成') ? "模型扫描完成" : "", 1500);
             return refreshDirCache(book);
         }).then(function () {
             try { renderMini(false); } catch (e) {}
@@ -4040,6 +4052,20 @@ function viewDirector() {
         '</div>';
 
 
+    // 导演注入的原文（用来核对到底给模型发了什么）
+    h += '<div class="ac-card"><div class="h">导演注入的提示词</div>' +
+        '<div style="display:flex;gap:6px;margin-bottom:8px">' +
+        '<button class="ac-btn" id="ac-dir-preview">预测这一轮</button>' +
+        '<button class="ac-btn" id="ac-dir-copy">复制上次注入</button>' +
+        '</div>' +
+        '<div class="ac-msg" id="ac-dir-msg"></div>' +
+        (last ? '<div class="hint" style="margin-top:10px">来源：' + (last.by === 'llm' ? '<b style="color:#8fd9b6">模型判断</b>' : (last.by === 'mild' ? '轻提' : '脚本')) +
+            (last.gap ? '　她当时 ' + last.gap + ' 楼没出场' : '') +
+            (last.at ? '　' + new Date(last.at).toLocaleTimeString() : '') + '</div>' +
+            '<div class="ac-view" style="margin-top:8px;max-height:260px">' + esc(last.text) + '</div>' :
+            '<div class="hint" style="margin-top:10px">还没注入过。点「预测这一轮」看看现在会安排谁。</div>') +
+        '</div>';
+
     h += '<div class="ac-card" style="background:#1b2224"><div class="h">一键修复世界书</div>' +
         '<div class="hint">有些角色认不出来，是因为她的条目名不统一，或者名字没写进关键词。' +
         '这里可以批量修好 —— 改的是你自己的世界书，改之前会列出具体改什么。</div>' +
@@ -4089,6 +4115,26 @@ function wireDirector() {
     bind('ac-dir-pos', 'directorPos', false);
     const ntf = $('ac-dir-notify');
     if (ntf) ntf.addEventListener('change', function () { settings().directorNotify = ntf.checked; persist(); });
+    // 导演注入的提示词：预测 + 复制
+    $('ac-dir-preview')?.addEventListener('click', function () {
+        const box = $('ac-dir-msg');
+        const r = previewDirector();
+        if (!box) return;
+        if (r.name) {
+            box.innerHTML = '<div class="hint">现在会安排：<b style="color:#ffd479">' + esc(r.name) + '</b>' +
+                (r.never ? '（还从没出场过）' : ('（已经 ' + r.gap + ' 楼没出场）')) + '</div>' +
+                '<div class="ac-view" style="margin-top:6px">' + esc(directorText({ pick: r })) + '</div>';
+            box.className = 'ac-msg';
+        } else {
+            box.innerHTML = '<div class="hint">' + esc(r.why || '这一轮不安排出场') + '</div>';
+        }
+    });
+    $('ac-dir-copy')?.addEventListener('click', function () {
+        const txt = (state.dirLast && state.dirLast.text) || '';
+        if (!txt) { toast('还没有注入过', null, 3000); return; }
+        try { navigator.clipboard.writeText(txt); toast('已复制', null, 2500); }
+        catch (e) { toast('复制失败', null, 3000); }
+    });
     const idle = $('ac-dir-idle');
     if (idle) idle.addEventListener('change', function () { settings().directorIdleOnly = idle.checked; persist(); });
 
@@ -4466,6 +4512,8 @@ function previewDirector() {
             name: r.pick.name,
             by: 'script',
             gap: r.pick.gap,
+            never: !!r.pick.never,
+            strength: r.pick.strength || 'strong',
             scenes: r.pick.scenes || [],
             hit: r.pick.hit || [],
             hint: r.pick.hint || '',
