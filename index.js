@@ -3786,10 +3786,20 @@ function msgTexts() {
 // 这一轮适不适合插人进来
 // 正戏、打斗、情绪高点都不适合 —— 让人凭空出现只会毁气氛
 function sceneBusy(text) {
-    const t2 = String(text || '');
+    let t2 = String(text || '');
     if (!t2) return '';
+    // 先剥掉元数据段：数据库召回、补充信息、剧情编排计划。
+    // 这些段落会写「柳玉线的高潮节点」这类话，不是正在发生的事；
+    // 不剥掉就会把日常场景误判成正戏（实测命中过）。
+    t2 = t2
+        .replace(/<recall>[\s\S]*?<\/recall>/gi, ' ')
+        .replace(/<supplement>[\s\S]*?<\/supplement>/gi, ' ')
+        .replace(/<report[^>]*>[\s\S]*?<\/report[^>]*>/gi, ' ')
+        .replace(/<thought>[\s\S]*?<\/thought>/gi, ' ')
+        .replace(/<plan>[\s\S]*?<\/plan>/gi, ' ')
+        .replace(/<StatusPlaceHolderImpl\s*\/?>/gi, ' ');
     // 强信号：出现一个就说明在正戏里
-    const STRONG = /呻吟|娇喘|抽插|肉棒|小穴|菊穴|龟头|阴道|射精|射了|射在|内射|高潮|赤裸|一丝不挂|全裸|裸体|舌吻|爱液|蜜液|淫液|痉挛|挺进|插进|进入了她|进入了他|做爱|性交|自慰|口交|乳交|插入/g;
+    const STRONG = /呻吟|娇喘|抽插|肉棒|小穴|菊穴|龟头|阴道|射精|射了|射在|内射|(?<!剧情)(?<!线的)(?<!故事)高潮|赤裸|一丝不挂|全裸|裸体|舌吻|爱液|蜜液|淫液|痉挛|挺进|插进|进入了她|进入了他|做爱|性交|自慰|口交|乳交|插入/g;
     const strongHits = t2.match(STRONG) || [];
     if (strongHits.length) return '当前在亲密戏里（' + strongHits.slice(0, 3).join('、') + '）';
     // 弱信号：两个以上才算，避免日常描写误判
@@ -4920,5 +4930,5 @@ jQuery(async () => {
     ensurePanel();
     try { ensureMini(); } catch (e) { console.warn('[命运织机] 浮动小面板创建失败', e); }
     try { watchCharacter(); } catch (e) { console.warn('[命运织机] 切换监听启动失败', e); }
-    console.log('[命运织机] v0.6.0 已加载 · 世界书 ' + state.books.length + ' 本');
+    console.log('[命运织机] v' + VERSION + ' 已加载 · 世界书 ' + state.books.length + ' 本');
 });
