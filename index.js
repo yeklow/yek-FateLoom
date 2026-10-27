@@ -4033,14 +4033,7 @@ function runDirector() {
             try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
             try { const nmI = (state.dirInject || [])[0] && state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
         state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap, by: "script" };
-        // 指定是一次性的：这一轮安排到了就自动取消，回到轮流出场
-        if (s.directorMode === 'pin' && s.directorPin) {
-            console.log('[命运织机] 指定已生效：' + res.pick.name + '，自动取消指定');
-            s.directorPin = '';
-            s.directorMode = 'rotate';
-            persist();
-            try { renderMini(false); } catch (e) {}
-        }
+        // 指定是持续生效的：只要没点「取消」，每一轮都强制她出场
     try { renderDirStatus(); } catch (e) {}
         console.log("[命运织机] 导演：推荐 " + res.pick.name + "（" + res.pick.gap + " 楼未出场，场景词命中）");
         toastDirector('script', res.pick.name, res.pick.gap);
@@ -4636,8 +4629,8 @@ function dirStatusCore() {
     const pinNow = (settings().directorMode === 'pin' && settings().directorPin) ? String(settings().directorPin) : '';
     if (pinNow) return '<div style="padding:10px 12px;line-height:1.7">' +
         '<div><b style="color:#ffd479">' + esc(pinNow) + '</b>' +
-        '<span style="font-size:11px;color:#6f8080;margin-left:6px">下一轮必定出场</span></div>' +
-        '<div style="font-size:11px;color:#6f8080">无视场景和出场频率，下一轮直接安排她。出场后自动取消指定。</div>' + '</div>';
+        '<span style="font-size:11px;color:#6f8080;margin-left:6px">每轮强制出场</span></div>' +
+        '<div style="font-size:11px;color:#6f8080">无视场景和出场频率，每一轮都强制安排她出现。不再自动取消，点「取消」才停。</div>' + '</div>';
     if (!last) {
         return '<div class="mini-e" style="padding:10px 12px">这一轮导演还没出手。<br>点「预测」看看它打算怎么安排。</div>';
     }
@@ -4801,7 +4794,7 @@ async function renderMini(needCache) {
             } else {
                 st.directorPin = nm;
                 st.directorMode = 'pin';
-                toast('已指定「' + nm + '」：下一轮必定出场（无视场景和频率），出场后自动取消', null, 5000);
+                toast('已指定「' + nm + '」：从现在起每轮强制出场（无视场景和频率），点「取消」才停', null, 5000);
             }
             persist();
             renderMini(false);
