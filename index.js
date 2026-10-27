@@ -3998,7 +3998,8 @@ function runDirector() {
         // 一档：模型在检测时顺带给的判断（同一次请求，不额外花钱）
         const sg = state.dirSuggestion;
         const fresh = sg && sg.name && (Date.now() - (sg.at || 0) < 15 * 60 * 1000);
-        if (fresh) {
+        // 玩家指定时不能走这条捷径：否则模型随口给的建议会把「指定」顶掉
+        if (fresh && !playerPicked) {
             const c = ((state.dirCache && state.dirCache.chars) || []).find(function (x) { return x.name === sg.name; });
             sg.trig = triggerOf(sg.name);
             const text2 = [
@@ -4009,7 +4010,7 @@ function runDirector() {
                 "除非和正在发生的事直接矛盾，否则不要跳过。",
             ].filter(Boolean).join(String.fromCharCode(10));
             ctx.setExtensionPrompt(DIR_KEY, text2, pos, depth, true, 0);
-            try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
+            try { state.dirInject.unshift({ at: Date.now(), name: (sg && sg.name) || '', len: String(text2 || '').length, forced: false }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
             try { const nmI = (state.dirInject || [])[0] && state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
             state.dirLast = { at: Date.now(), name: sg.name, text: text2, gap: 0, by: "llm" };
     try { renderDirStatus(); } catch (e) {}
@@ -4029,8 +4030,10 @@ function runDirector() {
         res.pick.trig = triggerOf(res.pick.name);
         const text = directorText(res);
         if (!text) { clearDirector(); return; }
-        ctx.setExtensionPrompt(DIR_KEY, text, pos, depth, true, 0);
-            try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
+        // 指定的人贴得更近：depth 0 = 紧贴在这一段之后，模型很难忽略
+        const useDepth = (res.pick && res.pick.forced) ? 0 : depth;
+        ctx.setExtensionPrompt(DIR_KEY, text, pos, useDepth, true, 0);
+            try { state.dirInject.unshift({ at: Date.now(), name: res.pick.name, len: String(text || '').length, forced: !!res.pick.forced }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
             try { const nmI = (state.dirInject || [])[0] && state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
         state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap, by: "script" };
         // 指定是持续生效的：只要没点「取消」，每一轮都强制她出场
