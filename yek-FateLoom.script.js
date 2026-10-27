@@ -3845,10 +3845,14 @@ function directorPick() {
     const PLACE_RX = /厨房|客厅|卧室|浴室|卫生间|澡堂|阳台|玄关|走廊|电梯|楼梯|书房|餐厅|教室|办公室|操场|天台|屋顶|地下室|车库|花园|庭院|便利店|超市|医院|病房|街头|车里|门口|门外/;
     const gapNeed = Math.max(1, Number(s.directorGap) || 8);
 
-    // 空闲检测：最近一楼是否在打斗/激烈冲突里
-    if (s.directorIdleOnly) {
+    // 玩家明确指定的人（pin / 立刻）不受场景限制 —— 你说了要她上，就让她上
+    const playerPicked = (s.directorMode === 'pin' && s.directorPin) || state.forceNext;
+    if (!playerPicked) {
         const whyBusy = sceneBusy(texts.slice(-2).join('\n'));
         if (whyBusy) return { skip: true, why: whyBusy + '，这一轮不安排任何人出场' };
+    } else {
+        const busyLite = sceneBusy(texts.slice(-2).join('\n'));
+        if (busyLite) console.log('[命运织机] ' + busyLite + '，但这是你指定的人，照常安排');
     }
 
     // 每个人：上次出现楼层（从记录里取，没有就从正文里找最后一次提到）
@@ -3933,6 +3937,8 @@ function directorPick() {
         });
         if (pinned) {
             pinned.strength = 'strong';
+            pinned.forced = true;          // 玩家指定的人：注入里带「必须出现」
+            if (state.forceNext === pinName) state.forceNext = '';
             if (state.forceNext === pinName) { state.forceNext = ''; pinned.forced = true; }
             return { pick: pinned, all: rows, byMode: 'pin' };
         }
@@ -3960,8 +3966,13 @@ function directorText(res) {
         L.push('如果实在接不上，就跳过本提示。');
     } else if (p.strength === 'strong') {
         L.push('这一轮请让她出现在这一段里。她怎么出场、先做了什么、说了什么，按她的人设和你这一段的行文自然写，不要照搬任何固定句式。');
-        L.push('如果现在不适合她本人进来（正在亲密、正在打斗、正在情绪爆点），可以退一步：让在场的某个人自然地提她一句，或者出现一件和她有关的东西。一句话带过，别像在念设定。');
-        L.push('退不了就跳过本提示，下一轮还有机会。');
+        if (p.forced) {
+            // 玩家点名要她上：不管什么场景都得出场，不给退路
+            L.push('不管现在是什么场景 —— 哪怕是亲密场面或激烈冲突 —— 都要让她出现在这一段里，自然地加入，不要跳过。');
+        } else {
+            L.push('如果现在不适合她本人进来（正在亲密、正在打斗、正在情绪爆点），可以退一步：让在场的某个人自然地提她一句，或者出现一件和她有关的东西。一句话带过，别像在念设定。');
+            L.push('退不了就跳过本提示，下一轮还有机会。');
+        }
         if (p.forced) L.push('本轮回复里必须出现「' + p.name + '」的动作或对话，不能只在旁白里提一下名字。');
     } else {
         L.push('她可以出现在这一段，也可以不出现 —— 你觉得自然就让她进，觉得突兀就忽略本提示。');
