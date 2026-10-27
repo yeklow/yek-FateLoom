@@ -4005,12 +4005,16 @@ function runDirector() {
         if (!s.director) { clearDirector(); return; }
         if (!ctx.setExtensionPrompt) return;
 
+        // 玩家指定的人 = 一发强制令：无视场景、无视节奏，下一轮必定出场
+        // （不然你把出场频率调成 15 楼，指定的人要等 15 轮，那不叫指定）
+        const playerPicked = (s.directorMode === 'pin' && s.directorPin) || state.forceNext;
+
         // 全局节奏：不管轮到谁，两次安排之间至少隔 directorEvery 楼
-        // （原来只有「同一个人冷却」，13 个人轮着来等于每轮都有人到期）
+        // 玩家指定的人不吃这条限制
         const every = Math.max(1, Number(s.directorEvery) || 3);
         const meta = dirMeta();
         const floorNow = msgTexts().length;
-        if (meta.lastFloor != null && floorNow - meta.lastFloor < every) { clearDirector(); return; }
+        if (!playerPicked && meta.lastFloor != null && floorNow - meta.lastFloor < every) { clearDirector(); return; }
         meta.lastFloor = floorNow;
         persist();
 
@@ -4065,6 +4069,14 @@ function runDirector() {
             try { state.dirInject.unshift({ at: Date.now(), name: (res && res.pick && res.pick.name) || (sg && sg.name) || '', len: String(text || text2 || mt || '').length, forced: !!(res && res.pick && res.pick.forced) }); state.dirInject = state.dirInject.slice(0, 8); } catch (e) {}
             try { const nmI = (state.dirInject || [])[0] && state.dirInject[0].name; if (nmI) { const lg = dirLog(); lg[nmI] = Math.max(0, msgTexts().length - 1); persist(); } } catch (e) {}
         state.dirLast = { at: Date.now(), name: res.pick.name, text: text, gap: res.pick.gap, by: "script" };
+        // 指定是一次性的：这一轮安排到了就自动取消，回到轮流出场
+        if (s.directorMode === 'pin' && s.directorPin) {
+            console.log('[命运织机] 指定已生效：' + res.pick.name + '，自动取消指定');
+            s.directorPin = '';
+            s.directorMode = 'rotate';
+            persist();
+            try { renderMini(false); } catch (e) {}
+        }
     try { renderDirStatus(); } catch (e) {}
         console.log("[命运织机] 导演：推荐 " + res.pick.name + "（" + res.pick.gap + " 楼未出场，场景词命中）");
         toastDirector('script', res.pick.name, res.pick.gap);
@@ -4660,8 +4672,8 @@ function dirStatusCore() {
     const pinNow = (settings().directorMode === 'pin' && settings().directorPin) ? String(settings().directorPin) : '';
     if (pinNow) return '<div style="padding:10px 12px;line-height:1.7">' +
         '<div><b style="color:#ffd479">' + esc(pinNow) + '</b>' +
-        '<span style="font-size:11px;color:#6f8080;margin-left:6px">已指定，等合适时机</span></div>' +
-        '<div style="font-size:11px;color:#6f8080">她够久没出场、当前场景不激烈时就会推她出场</div>' + '</div>';
+        '<span style="font-size:11px;color:#6f8080;margin-left:6px">下一轮必定出场</span></div>' +
+        '<div style="font-size:11px;color:#6f8080">无视场景和出场频率，下一轮直接安排她。出场后自动取消指定。</div>' + '</div>';
     if (!last) {
         return '<div class="mini-e" style="padding:10px 12px">这一轮导演还没出手。<br>点「预测」看看它打算怎么安排。</div>';
     }
@@ -4811,17 +4823,8 @@ async function renderMini(needCache) {
             '<input type="checkbox" data-mpick="' + esc(c.name) + '"' + chk + ' />' +
             '<span class="mini-n" style="' + (pinned ? 'color:#ffd479' : '') + '">' + esc(c.name) + (pinned ? ' ★' : '') + '</span>' +
             '<button class="mini-pin" data-pin="' + esc(c.name) + '" title="' + (pinned ? '取消指定' : '指定她优先出场') + '">' + (pinned ? '取消' : '指定') + '</button>' +
-            (pinned ? '<button class="mini-pin" data-force="' + esc(c.name) + '" title="跳过间隔限制，这一轮就让她出场" style="background:#8fd9b6;color:#10201c">立刻</button>' : '') +
             '<span class="mini-t">' + esc(tag) + '</span></div>';
-            '<span class="mini-t">' + esc(tag) + '</span></label>';
     }).join("");
-    list.querySelectorAll('[data-force]').forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-            e.preventDefault();
-            state.forceNext = btn.dataset.force;
-            toast('下一轮会强制让「' + btn.dataset.force + '」出场（跳过间隔限制）', null, 5000);
-        });
-    });
     list.querySelectorAll('[data-pin]').forEach(function (btn) {
         btn.addEventListener('click', async function (e) {
             e.preventDefault();
@@ -4829,12 +4832,12 @@ async function renderMini(needCache) {
             const nm = btn.dataset.pin;
             if (st.directorPin === nm && st.directorMode === 'pin') {
                 st.directorPin = '';
-                st.directorMode = 'scene';
+                st.directorMode = 'rotate';
                 toast('取消指定', null, 2500);
             } else {
                 st.directorPin = nm;
                 st.directorMode = 'pin';
-                toast('已指定「' + nm + '」优先出场：她够久没出现、场景又不激烈时就会推她', null, 5000);
+                toast('已指定「' + nm + '」：下一轮必定出场（无视场景和频率），出场后自动取消', null, 5000);
             }
             persist();
             renderMini(false);
