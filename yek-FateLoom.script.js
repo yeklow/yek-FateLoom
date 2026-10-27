@@ -4028,6 +4028,32 @@ function runDirector() {
             return ks[0];
         };
 
+        // ── 指定的人出场后自动取消 ──
+        // 判断依据是「上一条回复里真的有她的名字/关键词」，不是注入成功就取消。
+        // 这样模型万一没写她，下一轮还会继续催。
+        try {
+            if (s.directorMode === 'pin' && s.directorPin) {
+                const ch = (live().chat || []);
+                let lastAi = null;
+                for (let i2 = ch.length - 1; i2 >= 0; i2--) {
+                    if (ch[i2] && !ch[i2].is_user && ch[i2].mes) { lastAi = ch[i2]; break; }
+                }
+                const aiTxt = lastAi ? String(lastAi.mes) : '';
+                const pinName2 = String(s.directorPin);
+                const trig2 = triggerOf(pinName2);
+                const newReply = ch.length > (Number(s.directorPinAt) || 0);
+                if (newReply && aiTxt && (aiTxt.indexOf(pinName2) >= 0 || (trig2 && trig2 !== pinName2 && aiTxt.indexOf(trig2) >= 0))) {
+                    s.directorPin = '';
+                    s.directorMode = 'rotate';
+                    s.directorPinAt = 0;
+                    persist();
+                    console.log('[命运织机] 「' + pinName2 + '」已经出场，自动取消指定');
+                    try { renderMini(false); } catch (e) {}
+                    try { toast('「' + pinName2 + '」已出场，指定自动取消', null, 3000); } catch (e) {}
+                }
+            }
+        } catch (e) { console.warn('[命运织机] 自动取消指定失败', e); }
+
         const pos = s.directorPos === "before" ? 2 : (s.directorPos === "in_prompt" ? 0 : 1);
         const depth = Math.max(0, Number(s.directorDepth) || 4);
 
@@ -4668,8 +4694,8 @@ function dirStatusCore() {
     const pinNow = (settings().directorMode === 'pin' && settings().directorPin) ? String(settings().directorPin) : '';
     if (pinNow) return '<div style="padding:10px 12px;line-height:1.7">' +
         '<div><b style="color:#ffd479">' + esc(pinNow) + '</b>' +
-        '<span style="font-size:11px;color:#6f8080;margin-left:6px">每轮强制出场</span></div>' +
-        '<div style="font-size:11px;color:#6f8080">无视场景和出场频率，每一轮都强制安排她出现。不再自动取消，点「取消」才停。</div>' + '</div>';
+        '<span style="font-size:11px;color:#6f8080;margin-left:6px">出场一次后自动取消</span></div>' +
+        '<div style="font-size:11px;color:#6f8080">无视场景和出场频率，强行安排她出场；看到她出现在回复里后自动取消。模型没写她就继续催。</div>' + '</div>';
     if (!last) {
         return '<div class="mini-e" style="padding:10px 12px">这一轮导演还没出手。<br>点「预测」看看它打算怎么安排。</div>';
     }
@@ -4829,11 +4855,14 @@ async function renderMini(needCache) {
             if (st.directorPin === nm && st.directorMode === 'pin') {
                 st.directorPin = '';
                 st.directorMode = 'rotate';
+                st.directorPinAt = 0;
                 toast('取消指定', null, 2500);
             } else {
                 st.directorPin = nm;
                 st.directorMode = 'pin';
-                toast('已指定「' + nm + '」：从现在起每轮强制出场（无视场景和频率），点「取消」才停', null, 5000);
+                // 记下指定生效时的楼层数：只有「指定之后新来的回复」里出现她，才算真的出场
+                try { st.directorPinAt = (live().chat || []).length; } catch (e) { st.directorPinAt = 0; }
+                toast('已指定「' + nm + '」：无视场景和频率强行出场，出场后自动取消', null, 5000);
             }
             persist();
             renderMini(false);
