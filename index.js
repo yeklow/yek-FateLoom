@@ -2566,6 +2566,25 @@ async function doWrite() {
     const s = settings();
     const book = $('ac-book') ? $('ac-book').value : s.targetBook;
     if (!state.plan) return setMsg('先分析', 'err', 'ac-msg2');
+    // ── 写入前拦一道：这本书里已经有她了，再写就是重复 ──
+    try {
+        const nm0 = String(state.plan.name || '').trim();
+        if (nm0 && await bookHasPerson(book, nm0)) {
+            let hits = [];
+            try {
+                const d0 = await getBook(book);
+                hits = Object.values(d0.entries || {})
+                    .map(function (e0) { return String(e0.comment || ''); })
+                    .filter(function (c0) { return !/^(TavernDB|ACU-)/i.test(c0) && c0.indexOf(nm0) >= 0; });
+            } catch (e0) {}
+            const msg0 = '这本书里已经有「' + nm0 + '」' +
+                (hits.length ? '（' + hits.slice(0, 6).join('、') + (hits.length > 6 ? ' 等 ' + hits.length + ' 条' : '') + '）' : '') +
+                '。\n\n现在写入会按新格式再新建 4 条，很可能重复。\n建议：去「更新角色」改她，或者先把旧条目删掉。\n\n确定仍然要写入吗？';
+            if (!window.confirm(msg0)) {
+                return setMsg('已取消写入 —— 书里已经有「' + nm0 + '」了。要去「更新角色」改她。', 'err', 'ac-msg2');
+            }
+        }
+    } catch (e0) { console.warn('[命运织机] 写入前重复检查失败', e0); }
 
     setMsg('写入中…', '', 'ac-msg2');
     const prog = toastProgress('世界书条目更新中…');
