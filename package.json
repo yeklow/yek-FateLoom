@@ -1,0 +1,13 @@
+{
+  "name": "yek-fateloom",
+  "version": "0.17.2",
+  "private": true,
+  "type": "module",
+  "description": "FateLoom (命运织机) — SillyTavern Galgame 演出扩展",
+  "scripts": {
+    "build": "node build-script.mjs",
+    "test": "node --test tests/speaker.test.mjs",
+    "test:e2e": "node tests/e2e-smoke.mjs",
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File package-release.ps1"
+  }
+}
