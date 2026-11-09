@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
- * yek命运织机 v0.17.3 —— 酒馆助手（Tavern Helper）单文件版
+ * yek命运织机 v0.18.0 —— 酒馆助手（Tavern Helper）单文件版
  *
  * 用法：酒馆助手 → 脚本库 → 新建脚本 → 粘贴本文件全部内容 → 保存
  * 依赖：JS-Slash-Runner（酒馆助手）4.x
@@ -385,7 +385,7 @@ function galV2Resolve(segs, names) {
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const VERSION = '0.17.3';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
+const VERSION = '0.18.0';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -6185,6 +6185,10 @@ function galStyle() {
         '#ac-gal-sprites .ac-gal-sprite.emote-jump{animation:acGalJump .45s cubic-bezier(.34,1.56,.64,1) both}',
         '#ac-gal-sprites .ac-gal-sprite.emote-sink{animation:acGalSink .7s ease-in-out both}',
         '#ac-gal-sprites .ac-gal-sprite.emote-shake{animation:acGalShake .35s ease-in-out both}',
+        '#ac-gal-emo-badge{position:absolute;left:14px;top:64px;z-index:6;display:none;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;background:rgba(15,23,42,.55);color:#e2e8f0;font-size:12px;line-height:1.4;border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 4px 16px rgba(0,0,0,.22);pointer-events:none;letter-spacing:.3px}',
+        '#ac-gal-emo-badge.on{display:inline-flex}',
+        '#ac-gal-emo-badge b{color:#7dd3fc;font-weight:600}',
+        '#ac-gal-emo-badge .src{opacity:.55;font-size:10px;margin-left:2px}',
     ].join('\n');
     document.head.appendChild(st);
     try { applyGalThemeCss(); } catch (e) { /* ignore */ }
@@ -6197,7 +6201,7 @@ function galOverlay() {
         ov = document.createElement('div');
         ov.id = 'ac-gal-overlay';
         ov.innerHTML =
-            '<div id="ac-gal-bg"></div><div id="ac-gal-shade"></div><div id="ac-gal-sprites"></div>' +
+            '<div id="ac-gal-bg"></div><div id="ac-gal-shade"></div><div id="ac-gal-sprites"></div><div id="ac-gal-emo-badge"></div>' +
             '<div id="ac-gal-top"><b>Galgame 模式</b><span id="ac-gal-info" style="font-size:12px;color:#9fb3ad;margin-left:10px"></span><span class="sp"></span>' +
             '<button id="ac-gal-open-loom">🎛 织机</button>' +
             '<button id="ac-gal-charstate">📝 变化</button>' +
@@ -6401,8 +6405,16 @@ function galSpriteEmotion(text) {
         const hit = findEmo(mp[1]);
         if (hit) return hit;
     }
-    // 3) 普通关键词
-    for (const m of GAL_EMO_MAP) { if (m.re.test(t)) return { zh: m.zh, en: m.en }; }
+    // 3) 普通关键词：按命中次数打分，避免数组顺序偏置（同一个词出现在多个分组时选更像的那个）
+    let _best = null, _bestScore = 0;
+    for (const m of GAL_EMO_MAP) {
+        try {
+            const re2 = new RegExp(m.re.source, 'g');
+            const hits = (t.match(re2) || []).length;
+            if (hits > _bestScore) { _bestScore = hits; _best = { zh: m.zh, en: m.en }; }
+        } catch (e) { /* ignore */ }
+    }
+    if (_best) return _best;
     // 4) 动作 / 神态 / 标点兜底（Gemini 建议：小说里大部分情绪藏在动作里）
     const lex = galActionEmotion(t);
     if (lex) return { zh: lex.zh, en: lex.en, motion: lex.motion };
@@ -6414,29 +6426,46 @@ const GAL_ACTION_LEX = [
     { re: /咬.{0,3}唇|别过(头|脸)|移开视线|脸颊.{0,6}(红|烫)|耳根|低头|绞着|局促|羞/, emo: 'embarrassment', motion: 'sink' },
     { re: /叹.{0,3}气|垂下(眼|眸|头)|苦笑|扯.{0,3}嘴角|失落|黯然|落寞|失望|无奈/, emo: 'disappointment', motion: 'sink' },
     { re: /皱.{0,3}眉|眯起(眼|眸)|冷笑|啧|翻.{0,3}白眼|抱起双臂|不耐|烦躁|烦/, emo: 'annoyance', motion: 'none' },
-    { re: /发抖|颤抖|缩了缩|后退|攥紧|吞.{0,3}唾沫|冷汗|僵住|紧张/, emo: 'nervousness', motion: 'shake' },
-    { re: /瞪大|猛地抬头|怔住|愣住|瞳孔|倒吸.{0,3}气|惊|震惊|意外/, emo: 'surprise', motion: 'jump' },
-    { re: /扑哧|弯起(眼|眉|唇)|勾起唇角|忍俊不禁|偷笑|掩嘴|好笑|有趣/, emo: 'amusement', motion: 'jump' },
-    { re: /挺起胸|扬起下巴|得意|哼哼|叉腰|骄傲|自豪/, emo: 'pride', motion: 'jump' },
-    { re: /凑近|贴近|吐气|舔.{0,3}唇|灼热|喘息|渴望|情欲/, emo: 'desire', motion: 'none' },
-    { re: /松了口气|拍了拍胸口|还好|幸好|放心|释然/, emo: 'relief', motion: 'sink' },
-    { re: /歪.{0,3}头|眨.{0,3}眼|打量|盯着|疑惑|不解|好奇/, emo: 'curiosity', motion: 'none' },
-    { re: /温柔|轻抚|摸.{0,3}头|依偎|柔声|心疼|关心/, emo: 'caring', motion: 'none' },
-    { re: /怒|吼|滚|混蛋|岂有此理|拍桌|生气|恼火/, emo: 'anger', motion: 'shake' },
-    { re: /泪|哭|哽咽|抽泣|鼻酸|伤心|难过/, emo: 'sadness', motion: 'sink' },
-    { re: /开心|太好了|欢呼|兴奋|期待|高兴|快乐/, emo: 'excitement', motion: 'jump' },
-    { re: /喜欢|爱你|深情|爱意/, emo: 'love', motion: 'none' },
-    { re: /感谢|谢谢|感激/, emo: 'gratitude', motion: 'none' },
-    { re: /害怕|恐惧|惊恐|怕/, emo: 'fear', motion: 'shake' },
-    { re: /后悔|懊恼|愧疚|歉意/, emo: 'remorse', motion: 'sink' },
-    { re: /恍然|意识到|原来如此|明白了/, emo: 'realization', motion: 'jump' },
+    { re: /发抖|颤抖|缩了缩|后退|攥紧|吞.{0,3}唾沫|冷汗|僵住|紧张|不安|忐忑/, emo: 'nervousness', motion: 'shake' },
+    { re: /瞪大|猛地抬头|怔住|愣住|瞳孔|倒吸.{0,3}气|惊|震惊|意外|愕然/, emo: 'surprise', motion: 'jump' },
+    { re: /扑哧|弯起(眼|眉|唇)|勾起唇角|忍俊不禁|偷笑|掩嘴|好笑|有趣|逗|噗/, emo: 'amusement', motion: 'jump' },
+    { re: /挺起胸|扬起下巴|得意|哼哼|叉腰|骄傲|自豪|不屑地笑/, emo: 'pride', motion: 'jump' },
+    { re: /凑近|贴近|吐气|舔.{0,3}唇|灼热|喘息|渴望|情欲|燥热|湿了/, emo: 'desire', motion: 'none' },
+    { re: /松了口气|拍了拍胸口|还好|幸好|放心|释然|松了劲/, emo: 'relief', motion: 'sink' },
+    { re: /歪.{0,3}头|眨.{0,3}眼|打量|盯着|疑惑|不解|好奇|困惑|迷茫/, emo: 'curiosity', motion: 'none' },
+    { re: /温柔|轻抚|摸.{0,3}头|依偎|柔声|心疼|关心|担心|小心地/, emo: 'caring', motion: 'none' },
+    { re: /怒|吼|滚|混蛋|岂有此理|拍桌|生气|恼火|咬牙|愤/, emo: 'anger', motion: 'shake' },
+    { re: /泪|哭|哽咽|抽泣|鼻酸|伤心|难过|悲伤|悲痛|心碎|哀伤/, emo: 'grief', motion: 'sink' },
+    { re: /开心|太好了|欢呼|兴奋|期待|高兴|快乐|雀跃|激动/, emo: 'excitement', motion: 'jump' },
+    { re: /喜欢|爱你|深情|爱意|宠溺|怜爱/, emo: 'love', motion: 'none' },
+    { re: /感谢|谢谢|感激|道谢/, emo: 'gratitude', motion: 'none' },
+    { re: /害怕|恐惧|惊恐|怕|胆怯|缩成一团/, emo: 'fear', motion: 'shake' },
+    { re: /后悔|懊恼|愧疚|歉意|自责/, emo: 'remorse', motion: 'sink' },
+    { re: /恍然|意识到|原来如此|明白了|恍然大悟/, emo: 'realization', motion: 'jump' },
+    { re: /佩服|赞叹|仰慕|崇拜|钦佩/, emo: 'admiration', motion: 'none' },
+    { re: /点头|认可|赞许|同意|竖.{0,2}拇指|赞了一声/, emo: 'approval', motion: 'none' },
+    { re: /不赞同|反对|摇头|不满|不以为然/, emo: 'disapproval', motion: 'none' },
+    { re: /厌恶|恶心|反感|嫌弃|作呕/, emo: 'disgust', motion: 'none' },
+    { re: /困惑|迷茫|不解|摸不着头脑/, emo: 'confusion', motion: 'none' },
+    { re: /期待|希望|憧憬|盼着|向往/, emo: 'optimism', motion: 'none' },
+    { re: /微笑|笑意|笑|嘴角.{0,3}(翘|弯)/, emo: 'joy', motion: 'jump' },
 ];
+const GAL_LOCAL_FALLBACK_POOL = ['curiosity', 'caring', 'approval', 'amusement', 'optimism', 'realization', 'relief', 'embarrassment', 'nervousness', 'disappointment', 'confusion', 'surprise', 'excitement', 'pride', 'gratitude', 'admiration', 'annoyance', 'remorse', 'disgust', 'fear', 'desire', 'grief', 'disapproval', 'love', 'anger'];
 function galActionEmotion(text) {
     const t = String(text || '');
+    let best = null, bestScore = 0;
     for (const it of GAL_ACTION_LEX) {
-        if (it.re.test(t)) { for (const m of GAL_EMO_MAP) { if (m.en === it.emo) return { zh: m.zh, en: m.en, motion: it.motion }; } }
+        try {
+            const re2 = new RegExp(it.re.source, 'g');
+            const hits = (t.match(re2) || []).length;
+            if (hits > bestScore) {
+                bestScore = hits;
+                for (const m of GAL_EMO_MAP) { if (m.en === it.emo) { best = { zh: m.zh, en: m.en, motion: it.motion }; break; } }
+            }
+        } catch (e) { /* ignore */ }
     }
-    // 标点兜底（完全没命中词汇时，也尽量不判 neutral）
+    if (best && bestScore > 0) return best;
+    // 标点/句式兜底（完全没命中词汇时，也尽量不判 neutral）
     if (/[?!！？]{1,2}/.test(t)) { for (const m of GAL_EMO_MAP) if (m.en === 'surprise') return { zh: m.zh, en: m.en, motion: 'jump' }; }
     if (/…{2,}|。。。/.test(t)) { for (const m of GAL_EMO_MAP) if (m.en === 'nervousness') return { zh: m.zh, en: m.en, motion: 'sink' }; }
     if (/[？?]$/.test(t)) { for (const m of GAL_EMO_MAP) if (m.en === 'curiosity') return { zh: m.zh, en: m.en, motion: 'none' }; }
@@ -6548,20 +6577,44 @@ function galSplitBeats(text) {
     }
     return merged;
 }
-function galBeatEmoLocal(text, seenNeutral) {
+function galBeatEmoLocal(text, seenNeutral, seed) {
+    const t = String(text || '');
     let emo = null;
-    try { emo = galSpriteEmotion(text); } catch (e) { emo = null; }
-    let isNeutral = !emo || !emo.en || emo.en === 'neutral';
-    if (isNeutral) {
-        seenNeutral.count++;
-        // 防死水：连续两句 neutral 时，轮换倾听态（Gemini 建议）
-        if (seenNeutral.count >= 2 || seenNeutral.total >= 6) {
-            const en = GAL_EMO_POOL_ANTI[seenNeutral.total % GAL_EMO_POOL_ANTI.length];
-            for (const m of GAL_EMO_MAP) if (m.en === en) { emo = { zh: m.zh, en: m.en, motion: '' }; isNeutral = false; break; }
-        }
-    } else seenNeutral.count = 0;
-    seenNeutral.total++;
-    return emo || { zh: '正常', en: 'neutral', motion: '' };
+    try { emo = galSpriteEmotion(t); } catch (e) { emo = null; }
+    const isNeutral = !emo || !emo.en || emo.en === 'neutral';
+    if (!isNeutral) {
+        seenNeutral.count = 0;
+        seenNeutral.total = (seenNeutral.total || 0) + 1;
+        return emo;
+    }
+    // 兜底：按句式线索 + 文本哈希轮转，从完整 25 色池里挑，不再固定 5 个
+    const cues = [];
+    if (/[？?]/.test(t)) cues.push('curiosity', 'confusion');
+    if (/[！!]/.test(t)) cues.push('excitement', 'surprise');
+    if (/…|。{3,}/.test(t)) cues.push('nervousness', 'disappointment');
+    if (/(你|您)/.test(t)) cues.push('caring', 'approval');
+    if (/(我们|一起|明天|以后)/.test(t)) cues.push('optimism', 'realization');
+    if (/(对不起|抱歉|怪我)/.test(t)) cues.push('remorse', 'sympathy');
+    const pool = cues.concat(GAL_LOCAL_FALLBACK_POOL).filter(function (x) { return x !== 'sympathy'; });
+    let h = 5381;
+    const src = t + '§' + String(seed === undefined ? (seenNeutral.total || 0) : seed);
+    for (let k = 0; k < src.length; k++) h = ((h << 5) + h + src.charCodeAt(k)) | 0;
+    const last = Array.isArray(seenNeutral.last) ? seenNeutral.last : [];
+    let pick = '';
+    for (let k = 0; k < pool.length; k++) {
+        const cand = pool[(Math.abs(h) + k) % pool.length];
+        if (last.length && last[last.length - 1] === cand) continue;
+        pick = cand;
+        break;
+    }
+    if (!pick) pick = pool[Math.abs(h) % pool.length] || 'curiosity';
+    last.push(pick);
+    while (last.length > 3) last.shift();
+    seenNeutral.last = last;
+    seenNeutral.count = (seenNeutral.count || 0) + 1;
+    seenNeutral.total = (seenNeutral.total || 0) + 1;
+    for (const m of GAL_EMO_MAP) if (m.en === pick) return { zh: m.zh, en: m.en, motion: '' };
+    return { zh: '好奇', en: 'curiosity', motion: '' };
 }
 // 建时间轴（同步本地兜底 + 异步 AI 覆盖）
 function galEnsureTimeline(st, speakers) {
@@ -6578,7 +6631,7 @@ function galEnsureTimeline(st, speakers) {
             const spk = (speakers && speakers[i]) || prevSpeaker || '';
             if (speakers && speakers[i]) prevSpeaker = speakers[i];
             const seen = { count: 0, total: 0 };
-            const locals = beats.map(function (b) { return galBeatEmoLocal(b.text, seen); });
+            const locals = beats.map(function (b, bi2) { return galBeatEmoLocal(b.text, seen, i * 100 + bi2); });
             tl.byIdx[i] = { plain: plain, plainLen: plain.length, beats: beats, locals: locals, speaker: spk };
         }
         st.emoTimeline = tl;
@@ -6609,8 +6662,9 @@ function galBeatEmo(tl, segIdx, beatIdx) {
         if (!info || !info.beats.length) return { zh: '正常', en: 'neutral' };
         const bi = Math.max(0, Math.min(info.beats.length - 1, beatIdx));
         const id = 's' + segIdx + '_b' + bi;
-        if (tl.emoAi && tl.emoAi[id]) return tl.emoAi[id];
-        return info.locals[bi] || { zh: '正常', en: 'neutral' };
+        if (tl.emoAi && tl.emoAi[id]) { const a = tl.emoAi[id]; return { zh: a.zh, en: a.en, motion: a.motion || '', src: 'ai' }; }
+        const l = info.locals[bi];
+        return l ? { zh: l.zh, en: l.en, motion: l.motion || '', src: 'local' } : { zh: '正常', en: 'neutral' };
     } catch (e) { return { zh: '正常', en: 'neutral' }; }
 }
 function galBeatEmoToEn(emo) { return String((emo && emo.en) || 'neutral'); }
@@ -6619,21 +6673,11 @@ function galFetchEmoTimeline(entries, cacheKey) {
     const cached = _emoTimelineCache[cacheKey];
     if (cached && (Date.now() - cached.t) < 10 * 60 * 1000) return Promise.resolve(cached.map || null);
     const labels = GAL_EMO_MAP.map(function (m) { return m.en; });
-    if (entries.length > 24) entries = entries.slice(0, 24);
-    const lines = entries.map(function (e) { return e.id + '|' + (e.spk || '旁白') + '|' + String(e.text).replace(/\|/g, '/').slice(0, 80); }).join('\n');
-    const prompt = [
-        '你是视觉小说(Galgame)演出导演。为下面每个分句标注「画面主角此刻的立绘表情」。',
-        '可选表情（只能选这些英文标签）：' + labels.join(', ') + '。',
-        '规则：',
-        '1. 严禁滥用 neutral：neutral 不超过总数的 15%。平淡倾听用 curiosity/caring，平淡赞同用 approval，敷衍用 annoyance/disappointment。',
-        '2. 动作/神态/旁白也要推断角色脸上的表情（例：咬唇/别过脸 -> embarrassment；叹气/垂眼 -> disappointment；皱眉 -> annoyance；发抖/攥紧 -> nervousness；瞪大/怔住 -> surprise）。',
-        '3. 相邻句子尽量给出有细微递进的不同表情。',
-        '4. 情绪强烈时给动作标记 m：jump(雀跃/惊吓) / sink(失落/害羞低头) / shake(发抖/愤怒)，否则 none。',
-        '输入格式：每行 = id|说话人|句子',
-        '只输出合法 JSON 数组，不要代码块、不要解释，格式：[{"id":"s0_b0","e":"surprise","m":"jump"}]',
-        '分句列表：',
-        lines
-    ].join('\n');
+    const labelPairs = GAL_EMO_MAP.map(function (m) { return m.zh + '(' + m.en + ')'; }).join('、');
+    // 长消息不限 24 条：分批（每批 28 条）覆盖全部节拍，避免后半段全部掉回本地兜底
+    const all = entries.slice(0, 140);
+    const chunks = [];
+    for (let i = 0; i < all.length; i += 28) chunks.push(all.slice(i, i + 28));
     const parseTimeline = function (text) {
         let arr = null;
         try {
@@ -6665,23 +6709,68 @@ function galFetchEmoTimeline(entries, cacheKey) {
         }
         return map;
     };
-    // deepseek 这类推理模型会先烧 reasoning token，max_tokens 太小会导致正文为空 → 提高额度并重试一次
-    const attempt = function (maxTok, timeout) {
-        return callLLM(prompt, { maxTokens: maxTok, timeout: timeout }).then(function (raw) {
-            return { text: String(raw || ''), map: parseTimeline(String(raw || '')) };
-        }).catch(function () { return { text: '', map: {} }; });
+    const callChunk = function (chunk) {
+        const lines = chunk.map(function (e) { return e.id + '|' + (e.spk || '旁白') + '|' + String(e.text).replace(/\|/g, '/').slice(0, 80); }).join('\n');
+        const prompt = [
+            '你是视觉小说(Galgame)演出导演。为下面每个分句标注「画面主角此刻的立绘表情」。',
+            '可选表情（只能选这些英文标签，括号里是对应的中文含义）：' + labelPairs + '。',
+            '规则：',
+            '1. 严禁滥用 neutral：neutral 最多占本批的 10%；平淡倾听用 curiosity/caring，平淡赞同用 approval，敷衍用 annoyance/disappointment，观察/打量用 curiosity。',
+            '2. 动作/神态/旁白也要推断角色脸上的表情（例：咬唇/别过脸 -> embarrassment；叹气/垂眼 -> disappointment；皱眉 -> annoyance；发抖/攥紧 -> nervousness；瞪大/怔住 -> surprise；摸头/柔声 -> caring；点头 -> approval；摇头 -> disapproval）。',
+            '3. 这一批里尽量使用至少 8 种不同表情；同一个表情不能连续超过 2 句；相邻句子尽量给出细微递进的变化。',
+            '4. 情绪强烈时给动作标记 m：jump(雀跃/惊吓) / sink(失落/害羞低头) / shake(发抖/愤怒)，否则 none。',
+            '输入格式：每行 = id|说话人|句子',
+            '只输出合法 JSON 数组，不要代码块、不要解释，格式：[{"id":"s0_b0","e":"surprise","m":"jump"}]',
+            '分句列表：',
+            lines
+        ].join('\n');
+        const attempt = function (maxTok, timeout) {
+            return callLLM(prompt, { maxTokens: maxTok, timeout: timeout }).then(function (raw) {
+                return { text: String(raw || ''), map: parseTimeline(String(raw || '')) };
+            }).catch(function () { return { text: '', map: {} }; });
+        };
+        return attempt(2500, 40).then(function (r1) {
+            if (Object.keys(r1.map).length) return r1.map;
+            if (String(r1.text || '').trim()) return r1.map;
+            return attempt(4500, 55).then(function (r2) { return (r2 && r2.map) ? r2.map : {}; });
+        });
     };
-    return attempt(3000, 30).then(function (r1) {
-        if (Object.keys(r1.map).length) return r1;
-        if (String(r1.text || '').trim()) return r1;
-        return attempt(5000, 40);
-    }).then(function (r2) {
-        const map = (r2 && r2.map) ? r2.map : {};
+    let chain = Promise.resolve({});
+    chunks.forEach(function (ch) {
+        chain = chain.then(function (acc) {
+            return callChunk(ch).then(function (m) { for (const k in m) acc[k] = m[k]; return acc; });
+        });
+    });
+    return chain.then(function (map) {
+        const keys = Object.keys(map);
+        try {
+            const ens = {};
+            keys.forEach(function (k) { ens[map[k].en] = (ens[map[k].en] || 0) + 1; });
+            galDiag('emo_tl', { entries: all.length, chunks: chunks.length, got: keys.length, distinct: Object.keys(ens).length, dist: ens });
+        } catch (e) { /* ignore */ }
         _emoTimelineCache[cacheKey] = { t: Date.now(), map: map };
-        const keys = Object.keys(_emoTimelineCache);
-        if (keys.length > 40) delete _emoTimelineCache[keys[0]];
-        return Object.keys(map).length ? map : null;
+        const ck = Object.keys(_emoTimelineCache);
+        if (ck.length > 40) delete _emoTimelineCache[ck[0]];
+        return keys.length ? map : null;
     }).catch(function () { return null; });
+}
+// ── 左上角表情角标 ──
+function galSetEmoBadge(emo, speaker, src) {
+    try {
+        const el = document.getElementById('ac-gal-emo-badge');
+        if (!el) return;
+        const en = String((emo && emo.en) || '');
+        if (!en) { el.classList.remove('on'); return; }
+        let zh = String((emo && emo.zh) || '');
+        if (!zh || zh === 'normal') { const hit = GAL_EMO_MAP.find(function (m) { return m.en === en; }); zh = hit ? hit.zh : en; }
+        el.innerHTML = '🎭 表情：<b>' + esc(zh) + '</b><span style="opacity:.72">(' + esc(en) + ')</span>' +
+            (speaker ? '<span style="opacity:.55">· ' + esc(speaker) + '</span>' : '') +
+            (src ? '<span class="src">' + esc(src) + '</span>' : '');
+        el.classList.add('on');
+    } catch (e) { /* ignore */ }
+}
+function galHideEmoBadge() {
+    try { const el = document.getElementById('ac-gal-emo-badge'); if (el) el.classList.remove('on'); } catch (e) { /* ignore */ }
 }
 // 应用某个节拍的表情（带动作微动画）
 function galApplyBeatEmotion(name, emo, segText) {
@@ -6692,6 +6781,7 @@ function galApplyBeatEmotion(name, emo, segText) {
         const prev = st.spriteEmo && st.spriteEmo[name] ? galBeatEmoToEn(st.spriteEmo[name]) : '';
         st.lastEmoAt = Date.now();
         galUpdateSprite(name, segText || '', false, emo);
+        try { galSetEmoBadge(emo, name, emo.src || ''); } catch (e) { /* ignore */ }
         if (en !== prev) {
             try {
                 const wrap = document.getElementById('ac-gal-sprites');
@@ -7533,6 +7623,7 @@ function renderAssetChars() {
                 '<input type="file" accept="image/*" class="ac-expr-file" style="display:none">' +
                 '</div>' +
                 (chips ? '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">' + chips + '</div>' : '') +
+                '<div class="ac-official-emo" style="margin-top:8px"></div>' +
                 '</div></div>';
         }).join('');
         box.querySelectorAll('.ac-asset-row').forEach(function (row) {
@@ -7565,28 +7656,84 @@ function renderAssetChars() {
                 catch (e) { toast('清除失败', null, 3000); }
             });
         });
-        // ── 官方 sprites 目录探测：显示「官方立绘：N 个表情」，避免「未上传」误导 ──
+        // ── 官方 sprites 目录探测：列出每个表情是否已上传（✓已传 / ✗未传），可预览、可删单个 ──
         try {
             (async function () {
                 for (const n of names) {
                     try {
                         const list = await (await fetch('/api/sprites/get?name=' + encodeURIComponent(n) + '&_=' + Date.now())).json();
-                        if (!Array.isArray(list) || !list.length) continue;
                         const row = box.querySelector('.ac-asset-row[data-name="' + n.replace(/"/g, '\\"') + '"]');
                         if (!row) continue;
-                        const neutral = list.find(function (it) { return String(it.label || '').toLowerCase() === 'neutral'; }) || list[0];
-                        const url = neutral ? String(neutral.path || '') : '';
-                        if (url && row.dataset.hasbase !== '1') {
+                        const arr = Array.isArray(list) ? list : [];
+                        const have = {};
+                        for (const it of arr) {
+                            const lab = String((it && it.label) || '').toLowerCase();
+                            if (lab) have[lab] = String((it && it.path) || '');
+                        }
+                        const neutral = have['neutral'] || have['normal'] || '';
+                        if (neutral && row.dataset.hasbase !== '1') {
                             const thumb = row.querySelector('div[style*="width:46px"]');
-                            if (thumb) thumb.innerHTML = '<img src="' + esc(url) + '" style="width:100%;height:100%;object-fit:contain">';
+                            if (thumb) thumb.innerHTML = '<img src="' + esc(neutral) + '" style="width:100%;height:100%;object-fit:contain">';
+                        }
+                        const known = GAL_EMO_MAP.slice();
+                        const knownEns = {};
+                        known.forEach(function (m) { knownEns[m.en] = true; });
+                        const extra = Object.keys(have).filter(function (k) { return !knownEns[k]; });
+                        const total = known.length;
+                        let upCount = 0;
+                        const chip = function (zh, en, url, on) {
+                            if (on) upCount++;
+                            const st = on
+                                ? 'background:rgba(143,217,182,.16);border:1px solid rgba(143,217,182,.45);color:#cfe9dd'
+                                : 'background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.16);color:#6f8080';
+                            const title = on ? ('已上传：' + (url || ('characters/' + n + '/' + en + '.webp')) + '（点击预览）') : '未上传：' + en;
+                            return '<span class="ac-emo-chip" data-name="' + esc(n) + '" data-en="' + esc(en) + '" data-url="' + esc(url) + '" data-has="' + (on ? '1' : '0') + '" title="' + esc(title) + '" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:11px;cursor:' + (on ? 'pointer' : 'default') + ';' + st + '">' +
+                                (on ? '✓ ' : '✗ ') + esc(zh) + '<span style="opacity:.65">(' + esc(en) + ')</span>' +
+                                (on ? '<b class="ac-emo-del" data-name="' + esc(n) + '" data-en="' + esc(en) + '" title="从官方目录删除这个表情" style="cursor:pointer;color:#ff9a9a;font-weight:400;margin-left:2px">×</b>' : '') +
+                                '</span>';
+                        };
+                        const chips2 = known.map(function (m) { return chip(m.zh, m.en, have[m.en] || '', !!have[m.en]); }).join('') +
+                            extra.map(function (k) { return chip(k, k, have[k], true); }).join('');
+                        const holder = row.querySelector('.ac-official-emo');
+                        if (holder) {
+                            holder.innerHTML = '<div style="font-size:12px;margin-bottom:6px">' +
+                                '<span style="color:#8fd9b6;font-weight:600">官方目录：' + upCount + '/' + total + ' 个表情已上传</span>' +
+                                (neutral ? '　<span style="color:#9fb3d9">基础立绘：有 neutral</span>' : '') +
+                                (extra.length ? '　<span style="color:#9fb3d9">额外 ' + extra.length + ' 个</span>' : '') +
+                                (upCount < total ? '　<span style="color:#c9a96e">还差 ' + (total - upCount) + ' 个</span>' : '　<span style="color:#8fd9b6">全齐</span>') +
+                                '　<span style="color:#6f8080">点已上传的可预览</span></div>' +
+                                '<div style="display:flex;gap:5px;flex-wrap:wrap">' + chips2 + '</div>';
+                            holder.querySelectorAll('.ac-emo-chip[data-has="1"]').forEach(function (el) {
+                                el.addEventListener('click', function (ev) {
+                                    if (ev && ev.target && ev.target.closest && ev.target.closest('.ac-emo-del')) return;
+                                    const u = String(el.dataset.url || '');
+                                    if (u) { try { window.open(u, '_blank'); } catch (e) { /* ignore */ } }
+                                });
+                            });
+                            holder.querySelectorAll('.ac-emo-del').forEach(function (el) {
+                                el.addEventListener('click', async function (ev) {
+                                    if (ev) { try { ev.stopPropagation(); } catch (e) { /* ignore */ } }
+                                    const nm = String(el.dataset.name || '');
+                                    const en = String(el.dataset.en || '');
+                                    if (!nm || !en) return;
+                                    if (!confirm('从官方立绘目录删除「' + nm + '」的 ' + en + ' 表情？')) return;
+                                    try {
+                                        const ok = await galDeleteSpriteFile(nm, en);
+                                        if (!ok) throw new Error('删除接口返回失败');
+                                        toast('已删除 ' + nm + ' / ' + en, null, 2000);
+                                        try { if (state.gal) galRender(); } catch (e) { /* ignore */ }
+                                        renderAssetChars();
+                                    } catch (e) { toast('删除失败：' + (e.message || e), null, 3000); }
+                                });
+                            });
                         }
                         const hint = row.querySelector('.hint');
                         if (hint) {
-                            const oldTxt = String(hint.textContent || '');
-                            hint.innerHTML = (row.dataset.hasbase === '1' ? '基础立绘：已上传' : '基础立绘：未上传') +
-                                '　<span style="color:#8fd9b6;font-weight:600">官方目录已有 ' + list.length + ' 个表情</span>' +
-                                '（Galgame 直接使用）' +
-                                (oldTxt.indexOf('表情：') >= 0 ? '　' + oldTxt.slice(oldTxt.indexOf('表情：')) : '');
+                            const baseTxt = row.dataset.hasbase === '1' ? '基础立绘：已上传'
+                                : (neutral ? '基础立绘：官方目录有 neutral' : '基础立绘：未上传');
+                            hint.innerHTML = baseTxt +
+                                '　<span style="color:#8fd9b6;font-weight:600">官方目录 ' + upCount + '/' + total + ' 个表情</span>' +
+                                '（Galgame 直接使用）';
                         }
                     } catch (e) { /* ignore */ }
                 }
@@ -7922,6 +8069,7 @@ function galUpdateSprite(speaker, segText, narration, forcedEmo) {
         if (st.spriteCast.indexOf(speaker) < 0) st.spriteCast.push(speaker);
         st.lastSpeaker = speaker;
         st.spriteEmo[speaker] = forcedEmo || galSpriteEmotion(segText);
+        try { if (forcedEmo || !(state.gal && state.gal.emoTimeline)) galSetEmoBadge(st.spriteEmo[speaker], speaker, (forcedEmo && forcedEmo.src) || ''); } catch (e) { /* ignore */ }
     }
     if (_scene && _scene.length) {
         st.spriteCast = st.spriteCast.filter(function (n) { return _scene.indexOf(n) >= 0; });
