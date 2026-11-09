@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
- * yek命运织机 v0.18.1 —— 酒馆助手（Tavern Helper）单文件版
+ * yek命运织机 v0.18.2 —— 酒馆助手（Tavern Helper）单文件版
  *
  * 用法：酒馆助手 → 脚本库 → 新建脚本 → 粘贴本文件全部内容 → 保存
  * 依赖：JS-Slash-Runner（酒馆助手）4.x
@@ -385,7 +385,7 @@ function galV2Resolve(segs, names) {
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const VERSION = '0.18.1';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
+const VERSION = '0.18.2';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -6405,6 +6405,9 @@ function galSpriteEmotion(text) {
         const hit = findEmo(mp[1]);
         if (hit) return hit;
     }
+    // 2.5) 明确紧张/害怕词优先（发抖/颤同时命中 fear 和 nervousness 时按这里的明确词定）
+    if (/(紧张|心跳加速|心跳|局促|手足无措)/.test(t)) { for (const m of GAL_EMO_MAP) if (m.en === 'nervousness') return { zh: m.zh, en: m.en }; }
+    if (/(害怕|恐惧|惊恐|吓得|毛骨悚然)/.test(t)) { for (const m of GAL_EMO_MAP) if (m.en === 'fear') return { zh: m.zh, en: m.en }; }
     // 3) 亲密/情欲场景优先识别（呻吟+身体/体液线索），避免被判成紧张或平静
     try {
         const intimate = /(咿|唔|嗯|啊|咕|啾|噜|哼|喘)/.test(t) && /(喉咙|吞|咽|含|吮|吸|舔|精|奶|乳|汁|湿|淫|骚|媚|热|烫|胀|欲|身体|腰|腿|胸|口)/.test(t);
