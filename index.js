@@ -6,7 +6,7 @@ import { getContext } from '../../../extensions.js';
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const VERSION = '0.18.0';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
+const VERSION = '0.18.1';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -6026,6 +6026,14 @@ function galSpriteEmotion(text) {
         const hit = findEmo(mp[1]);
         if (hit) return hit;
     }
+    // 3) 亲密/情欲场景优先识别（呻吟+身体/体液线索），避免被判成紧张或平静
+    try {
+        const intimate = /(咿|唔|嗯|啊|咕|啾|噜|哼|喘)/.test(t) && /(喉咙|吞|咽|含|吮|吸|舔|精|奶|乳|汁|湿|淫|骚|媚|热|烫|胀|欲|身体|腰|腿|胸|口)/.test(t);
+        if (intimate) {
+            const hit = GAL_EMO_MAP.find(function (m) { return m.en === 'desire'; });
+            if (hit) return { zh: hit.zh, en: hit.en };
+        }
+    } catch (e) { /* ignore */ }
     // 3) 普通关键词：按命中次数打分，避免数组顺序偏置（同一个词出现在多个分组时选更像的那个）
     let _best = null, _bestScore = 0;
     for (const m of GAL_EMO_MAP) {
@@ -6052,6 +6060,9 @@ const GAL_ACTION_LEX = [
     { re: /扑哧|弯起(眼|眉|唇)|勾起唇角|忍俊不禁|偷笑|掩嘴|好笑|有趣|逗|噗/, emo: 'amusement', motion: 'jump' },
     { re: /挺起胸|扬起下巴|得意|哼哼|叉腰|骄傲|自豪|不屑地笑/, emo: 'pride', motion: 'jump' },
     { re: /凑近|贴近|吐气|舔.{0,3}唇|灼热|喘息|渴望|情欲|燥热|湿了/, emo: 'desire', motion: 'none' },
+    { re: /喉咙|嗓子|吞咽|吞下|含住|吮吸|舔弄|咽下|咕啾|咕噜|咿唔|咿呀|唔嗯|嗯啊/, emo: 'desire', motion: 'none' },
+    { re: /浓精|精液|奶水|乳汁|淫水|蜜液|黏液|淫|骚|媚|发情|求欢|勾引/, emo: 'desire', motion: 'none' },
+    { re: /（?羞|脸红|耳根|难为情|羞耻|不好意思|别过脸|低头.{0,4}不敢/, emo: 'embarrassment', motion: 'sink' },
     { re: /松了口气|拍了拍胸口|还好|幸好|放心|释然|松了劲/, emo: 'relief', motion: 'sink' },
     { re: /歪.{0,3}头|眨.{0,3}眼|打量|盯着|疑惑|不解|好奇|困惑|迷茫/, emo: 'curiosity', motion: 'none' },
     { re: /温柔|轻抚|摸.{0,3}头|依偎|柔声|心疼|关心|担心|小心地/, emo: 'caring', motion: 'none' },
@@ -6208,14 +6219,28 @@ function galBeatEmoLocal(text, seenNeutral, seed) {
         seenNeutral.total = (seenNeutral.total || 0) + 1;
         return emo;
     }
-    // 兜底：按句式线索 + 文本哈希轮转，从完整 25 色池里挑，不再固定 5 个
+    // 兜底：明确的紧张/害怕词直接判定（比句式线索更可靠）
+    if (/(紧张|心跳加速|心跳|发抖|颤抖|手心.{0,3}汗|不敢看|不敢抬头|局促)/.test(t)) {
+        for (const m of GAL_EMO_MAP) if (m.en === 'nervousness') return { zh: m.zh, en: m.en, motion: 'shake' };
+    }
+    if (/(害怕|恐惧|惊恐|吓得|毛骨悚然)/.test(t)) {
+        for (const m of GAL_EMO_MAP) if (m.en === 'fear') return { zh: m.zh, en: m.en, motion: 'shake' };
+    }
+    // 按句式线索 + 文本哈希轮转，从完整 25 色池里挑，不再固定 5 个
     const cues = [];
+    // 亲密/情欲语气优先：呻吟、吞咽、喘息、体液、发情等 → desire / excitement
+    if (/(咿|唔|嗯|啊|咕|啾|噜|哼|喘|哈啊)/.test(t) && /(喉咙|吞|咽|含|吮|吸|舔|精|奶|乳|汁|湿|淫|骚|媚|热|烫|胀|欲|身体|腰|腿)/.test(t)) {
+        cues.push('desire', 'excitement', 'embarrassment');
+    } else if (/(浓精|精液|奶水|乳汁|淫水|发情|淫|骚|媚|勾引|求欢)/.test(t)) {
+        cues.push('desire', 'embarrassment');
+    }
     if (/[？?]/.test(t)) cues.push('curiosity', 'confusion');
     if (/[！!]/.test(t)) cues.push('excitement', 'surprise');
-    if (/…|。{3,}/.test(t)) cues.push('nervousness', 'disappointment');
+    // 「……」本身不算紧张：只有明确紧张/发抖/害怕词才判 nervousness
+    if (/(紧张|心跳|发抖|颤|不敢|怕|局促|手心.{0,3}汗|深呼吸)/.test(t)) cues.push('nervousness', 'fear');
     if (/(你|您)/.test(t)) cues.push('caring', 'approval');
     if (/(我们|一起|明天|以后)/.test(t)) cues.push('optimism', 'realization');
-    if (/(对不起|抱歉|怪我)/.test(t)) cues.push('remorse', 'sympathy');
+    if (/(对不起|抱歉|怪我)/.test(t)) cues.push('remorse');
     const pool = cues.concat(GAL_LOCAL_FALLBACK_POOL).filter(function (x) { return x !== 'sympathy'; });
     let h = 5381;
     const src = t + '§' + String(seed === undefined ? (seenNeutral.total || 0) : seed);
