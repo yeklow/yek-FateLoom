@@ -526,18 +526,22 @@
   #ac-gal-sprites .ac-gal-sprite { max-width: 48vw; }
   #ac-gal-sprites .ac-gal-sprite.side { max-width: 34vw; }
   /* 手机上立绘：按宽度自适应、底部对齐，保证头部露在文字框上方 */
-  #ac-gal-sprites .ac-gal-sprite { object-position: bottom center !important; }
-  #ac-gal-sprites .ac-gal-sprite.main {
-    height: auto !important; max-height: 94vh !important;
-    max-width: 84vw !important; bottom: 0 !important;
+  #ac-gal-sprites .ac-gal-sprite {
+    object-position: bottom center !important;
+    height: var(--ac-sprite-h-mobile, 80vh) !important;
+    max-height: 94vh !important;
+    width: auto !important;
+    max-width: 94vw !important;
+    bottom: -14vh !important;
   }
   #ac-gal-sprites .ac-gal-sprite.side {
-    height: auto !important; max-height: 88vh !important;
-    max-width: 48vw !important; bottom: 0 !important;
+    height: calc(var(--ac-sprite-h-mobile, 80vh) * .86) !important;
+    max-width: 70vw !important;
+    bottom: -12vh !important;
   }
   /* 手机上长段落文字框限高，保证立绘露出来；文字框内部可滑动 */
   #ac-gal-text {
-    max-height: 38vh !important; overflow-y: auto !important;
+    max-height: 34vh !important; overflow-y: auto !important;
     -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
     scrollbar-width: thin;
   }

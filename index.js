@@ -6,7 +6,7 @@ import { getContext } from '../../../extensions.js';
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const VERSION = '0.18.2';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
+const VERSION = '0.19.0';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -569,8 +569,9 @@ const DEFAULTS = {
     vnTypewriter: true,     // Galgame 打字机效果（逐字显示）
     vnTypeSpeed: 40,        // 打字机速度（字/秒）
     vnSprite: true,         // Galgame 立绘开关
-    vnSpritePos: 'center',  // 立绘位置：center（默认=背景人物位置）/ right / left
-    vnSpriteSize: 112,      // 立绘高度（%），<90 视为旧档位自动迁移
+    vnSpritePos: 'right-third', // 立绘构图：right-third(右1/3,默认)/left-third/center/right/left
+    vnSpriteSize: 132,      // 立绘高度（%），90~165
+    vnLayoutMigratedV2: false, // 旧默认构图（center/112）迁移标记
     vnAutoReroll: true,      // 检测到 AI 回复被截断时自动重roll（Galgame 里）
     vnAutoRerollMax: 2,      // 自动重roll 最多几次
     vnStallSeconds: 10,      // 连续多少秒没有新字就判定为卡住/截断（5~10 秒）
@@ -670,6 +671,13 @@ function settings() {
     if (!_acInitedStores.has(s)) {
         for (const k of Object.keys(DEFAULTS)) if (s[k] === undefined) s[k] = structuredClone(DEFAULTS[k]);
         _acInitedStores.add(s);
+    }
+    // 旧默认构图（居中/112）一次性迁移到新的右三分之一构图
+    if (!s.vnLayoutMigratedV2) {
+        if (!s.vnSpritePos || s.vnSpritePos === 'center') s.vnSpritePos = 'right-third';
+        if (!s.vnSpriteSize || Number(s.vnSpriteSize) === 112) s.vnSpriteSize = 132;
+        s.vnLayoutMigratedV2 = true;
+        try { persist(); } catch (e) { /* ignore */ }
     }
     return s;
 }
@@ -3623,24 +3631,24 @@ function wireGalDisplaySettings() {
             if (!spPos._bound) {
                 spPos._bound = true;
                 spPos.addEventListener('change', function () {
-                    settings().vnSpritePos = String(spPos.value || 'right');
+                    settings().vnSpritePos = String(spPos.value || 'right-third');
                     persist();
                     try { if (state.gal) galRender(); } catch (e) { /* ignore */ }
                 });
             }
-            spPos.value = String(settings().vnSpritePos || 'right');
+            spPos.value = String(settings().vnSpritePos || 'right-third');
         }
         const spSize = $('ac-sprite-size');
         if (spSize) {
             if (!spSize._bound) {
                 spSize._bound = true;
                 spSize.addEventListener('change', function () {
-                    settings().vnSpriteSize = Number(spSize.value) || 112;
+                    settings().vnSpriteSize = Number(spSize.value) || 132;
                     persist();
                     try { if (state.gal) galRender(); } catch (e) { /* ignore */ }
                 });
             }
-            spSize.value = String(settings().vnSpriteSize || 112);
+            spSize.value = String(settings().vnSpriteSize || 132);
         }
         const spFb = $('ac-sprite-fallback');
         if (spFb) {
@@ -5721,7 +5729,7 @@ function galStyle() {
         '#ac-gal-top button{background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.85);color:#334155;border-radius:999px;padding:5px 13px;font-size:12px;cursor:pointer;box-shadow:0 1px 4px rgba(15,23,42,.08);transition:all .16s ease}',
         '#ac-gal-top button:hover{background:rgba(224,242,254,.92);border-color:#7dd3fc;color:#0284c7;box-shadow:0 2px 8px rgba(2,132,199,.15)}',
         '#ac-gal-main{flex:1 1 auto;display:flex;align-items:flex-end;justify-content:center;padding:0 4vw 3vh;position:relative;z-index:3}',
-        '#ac-gal-box{width:min(1120px,92vw);background:linear-gradient(135deg,rgba(252,253,255,.90) 0%,rgba(240,247,255,.87) 100%);border:1px solid rgba(255,255,255,.92);border-radius:16px;box-shadow:0 14px 38px -8px rgba(9,18,36,.32),inset 0 1px 0 0 rgba(255,255,255,.95),0 0 0 1px rgba(148,163,184,.16);padding:18px 30px;color:#1e293b;cursor:pointer;position:relative;min-height:120px;display:flex;flex-direction:column;justify-content:center;backdrop-filter:blur(18px) saturate(150%) brightness(103%);-webkit-backdrop-filter:blur(18px) saturate(150%) brightness(103%);transition:border-color .18s ease,box-shadow .18s ease}',
+        '#ac-gal-box{width:min(1080px,90vw);background:linear-gradient(135deg,rgba(252,253,255,.90) 0%,rgba(240,247,255,.87) 100%);border:1px solid rgba(255,255,255,.92);border-radius:16px;box-shadow:0 14px 38px -8px rgba(9,18,36,.32),inset 0 1px 0 0 rgba(255,255,255,.95),0 0 0 1px rgba(148,163,184,.16);padding:18px 30px;color:#1e293b;cursor:pointer;position:relative;min-height:120px;display:flex;flex-direction:column;justify-content:center;backdrop-filter:blur(18px) saturate(150%) brightness(103%);-webkit-backdrop-filter:blur(18px) saturate(150%) brightness(103%);transition:border-color .18s ease,box-shadow .18s ease}',
         '#ac-gal-box:hover{border-color:rgba(56,189,248,.55);box-shadow:0 18px 46px -8px rgba(9,18,36,.34),inset 0 1px 0 0 rgba(255,255,255,1),0 0 0 1px rgba(56,189,248,.25)}',
         '#ac-gal-name{display:inline-flex;align-self:flex-start;font-size:13px;font-weight:600;color:#ffffff;letter-spacing:.06em;margin-bottom:10px;min-height:0;padding:3px 13px;border-radius:999px;background:linear-gradient(135deg,#38bdf8 0%,#0284c7 100%);border:1px solid rgba(255,255,255,.85);box-shadow:0 4px 12px rgba(2,132,199,.25);text-shadow:none}',
         '#ac-gal-name:empty{display:none}',
@@ -5790,11 +5798,13 @@ function galStyle() {
         '#ac-gal-charstate-panel .cs-name{display:flex;align-items:center;gap:8px;padding:9px 15px;background:linear-gradient(90deg,rgba(224,242,254,.95) 0%,rgba(240,249,255,.6) 100%);border-top:1px solid rgba(186,230,253,.9);border-left:3px solid #0284c7;color:#0369a1;font-size:14px;font-weight:600;letter-spacing:.04em}',
         '#ac-gal-charstate-panel .cs-avatar{width:22px;height:22px;border-radius:50%;background:#dbeafe;color:#0369a1;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto}',
         '#ac-gal-sprites{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}',
+        '#ac-gal-sprites::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8vh;background:linear-gradient(to top,rgba(8,10,16,.30),transparent);z-index:4;pointer-events:none}',
         '#ac-gal-sprites.hide{display:none}',
-        '#ac-gal-sprites .ac-gal-sprite{position:absolute;bottom:calc(-1 * var(--ac-sprite-sink,26%));height:var(--ac-sprite-h,112%);max-width:62vw;object-fit:contain;object-position:bottom center;filter:drop-shadow(0 0 2px rgba(255,255,255,.18)) drop-shadow(0 14px 30px rgba(8,14,26,.42));opacity:0;transform:translateY(18px);transition:opacity .32s ease,transform .4s cubic-bezier(.22,1,.36,1),filter .35s ease,left .3s ease,right .3s ease,height .3s ease,bottom .3s ease,mask-image .3s ease;mask-image:linear-gradient(to bottom,#000 0%,#000 90%,rgba(0,0,0,.6) 98%,transparent 100%);-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 90%,rgba(0,0,0,.6) 98%,transparent 100%)}',
+        '#ac-gal-sprites .ac-gal-sprite{position:absolute;left:var(--ac-pos-x,50%);right:auto;margin:0;bottom:calc(-1 * var(--ac-sprite-sink,44%));height:var(--ac-sprite-h,132%);max-width:56vw;object-fit:contain;object-position:bottom center;transform:translateX(-50%);transform-origin:50% 85%;filter:drop-shadow(0 0 2px rgba(255,255,255,.18)) drop-shadow(0 14px 30px rgba(8,14,26,.42));opacity:0;transition:opacity .32s ease,transform .38s cubic-bezier(.22,1,.36,1),filter .35s ease,left .42s cubic-bezier(.22,1,.36,1),height .38s ease,bottom .38s ease,mask-image .3s ease;mask-image:linear-gradient(to bottom,#000 0%,#000 90%,rgba(0,0,0,.6) 98%,transparent 100%);-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 90%,rgba(0,0,0,.6) 98%,transparent 100%)}',
         '#ac-gal-sprites .ac-gal-sprite.on{opacity:1}',
-        '#ac-gal-sprites .ac-gal-sprite.main{z-index:3;transform:translateY(0) scale(1);filter:brightness(1.02) contrast(1.02) saturate(1.05) drop-shadow(0 0 2px rgba(255,255,255,.2)) drop-shadow(0 16px 34px rgba(8,14,26,.45))}',
-        '#ac-gal-sprites .ac-gal-sprite.side{z-index:2;transform:scale(.94) translateY(1.5vh);filter:brightness(.68) contrast(.97) saturate(.82) drop-shadow(0 8px 18px rgba(8,14,26,.38))}',
+        '#ac-gal-sprites .ac-gal-sprite.main{z-index:3;transform:translateX(-50%);filter:brightness(1.02) contrast(1.02) saturate(1.05) drop-shadow(0 0 2px rgba(255,255,255,.2)) drop-shadow(0 16px 34px rgba(8,14,26,.45))}',
+        '#ac-gal-sprites .ac-gal-sprite.side{z-index:2;transform:translateX(-50%) scale(.90) translateY(2.5vh);filter:brightness(.70) saturate(.85) drop-shadow(0 6px 16px rgba(8,14,26,.40))}',
+        '#ac-gal-sprites .ac-gal-sprite.side.side-far{z-index:1;transform:translateX(-50%) scale(.84) translateY(4.5vh);filter:brightness(.58) saturate(.78) drop-shadow(0 6px 16px rgba(8,14,26,.36))}',
         '#ac-gal-sprites .ac-gal-sprite.dim{filter:brightness(.88) contrast(.99) saturate(.95) drop-shadow(0 10px 24px rgba(8,14,26,.32))}',
         '#ac-gal-sprites .ac-gal-sprite.side.dim{filter:brightness(.66) contrast(.97) saturate(.8) drop-shadow(0 8px 18px rgba(8,14,26,.34))}',
         '#ac-gal-sprites .ac-gal-sprite.avatar{bottom:auto;height:calc(var(--ac-sprite-h,70%) * .5);border-radius:20px;border:3px solid rgba(255,255,255,.85);box-shadow:0 16px 40px rgba(15,23,42,.32);object-fit:cover}',
@@ -7141,8 +7151,8 @@ function viewAssets() {
         '<button class="ac-btn" id="ac-tw-toggle">打字机：开</button>' +
         '<select class="ac-input" id="ac-tw-speed" style="width:92px"><option value="20">慢</option><option value="40">中</option><option value="80">快</option></select>' +
         '<button class="ac-btn" id="ac-sprite-toggle">立绘：开</button>' +
-        '<select class="ac-input" id="ac-sprite-pos" style="width:92px"><option value="right">右侧</option><option value="center">居中</option><option value="left">左侧</option></select>' +
-        '<select class="ac-input" id="ac-sprite-size" style="width:92px"><option value="100">小</option><option value="112">中</option><option value="124">大</option><option value="140">特大</option></select>' +
+        '<select class="ac-input" id="ac-sprite-pos" style="width:128px"><option value="right-third">构图：右1/3（推荐）</option><option value="center">构图：居中</option><option value="left-third">构图：左1/3</option><option value="right">构图：靠右</option><option value="left">构图：靠左</option></select>' +
+        '<select class="ac-input" id="ac-sprite-size" style="width:112px"><option value="100">小</option><option value="116">中</option><option value="132">大（推荐）</option><option value="148">特大</option><option value="160">超大</option></select>' +
         '<select class="ac-input" id="ac-sprite-fallback" style="width:150px"><option value="default">无立绘用默认素材</option><option value="none">无立绘不显示</option></select>' +
         '<select class="ac-input" id="ac-emo-mode" style="width:150px"><option value="ai">表情：AI 识别</option><option value="keyword">表情：关键词</option></select>' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8fa0a0"><input type="checkbox" id="ac-auto-reroll" /> 截断自动重roll</label>' +
@@ -7730,55 +7740,59 @@ function galUpdateSprite(speaker, segText, narration, forcedEmo) {
     const mainName = speaker || st.lastSpeaker || (cast.length ? cast[cast.length - 1] : '');
     if (!mainName) { wrap.innerHTML = ''; return; }
     if (cast.indexOf(mainName) < 0) cast.push(mainName);
-    const pos = (function () { const p = String(s.vnSpritePos || 'center'); return /^(left|center|right)$/.test(p) ? p : 'center'; })();
-    const _rawSize = Number(s.vnSpriteSize) || 112;
-    let h = _rawSize < 90 ? (_rawSize <= 60 ? 100 : (_rawSize <= 75 ? 112 : 124)) : _rawSize;
-    h = Math.max(85, Math.min(150, h));
-    try { if (window.innerWidth < 600) h = Math.min(h, 96); } catch (e) { /* ignore */ }
-    const sink = Math.round(Math.max(6, Math.min(58, (h - 86) * 1.05)));
+    // ── 构图（Gemini 建议的黄金三分站位）：主立绘右 1/3，配角左/中左，第三远景 ──
+    let pos = String(s.vnSpritePos || 'right-third');
+    if (!/^(right-third|left-third|right|left|center)$/.test(pos)) pos = 'right-third';
+    const _rawSize = Number(s.vnSpriteSize) || 132;
+    let h = Math.max(90, Math.min(165, _rawSize));
+    const sink = Math.round(Math.max(8, Math.min(68, (h - 84) * 0.92)));
     wrap.style.setProperty('--ac-sprite-h', h + '%');
     wrap.style.setProperty('--ac-sprite-sink', sink + '%');
+    let _isMobile = false;
+    try { _isMobile = window.innerWidth <= 900; } catch (e) { /* ignore */ }
+    if (_isMobile) {
+        const mv = Math.round(72 + ((h - 90) / 75) * 20);
+        wrap.style.setProperty('--ac-sprite-h-mobile', Math.max(70, Math.min(94, mv)) + 'vh');
+    }
+    const LAYOUT_MAP = {
+        'right-third': { main: '68vw', sides: ['26vw', '46vw'] },
+        'right': { main: '74vw', sides: ['24vw', '46vw'] },
+        'left-third': { main: '32vw', sides: ['74vw', '54vw'] },
+        'left': { main: '26vw', sides: ['76vw', '54vw'] },
+        'center': { main: '50vw', sides: ['20vw', '80vw'] },
+    };
+    const MOBILE_LAYOUT_MAP = {
+        'right-third': { main: '56vw', sides: ['22vw', '80vw'] },
+        'right': { main: '58vw', sides: ['22vw', '80vw'] },
+        'left-third': { main: '44vw', sides: ['78vw', '18vw'] },
+        'left': { main: '42vw', sides: ['78vw', '18vw'] },
+        'center': { main: '50vw', sides: ['18vw', '82vw'] },
+    };
+    const activeLayout = (_isMobile ? MOBILE_LAYOUT_MAP : LAYOUT_MAP)[pos] || LAYOUT_MAP['right-third'];
     const sides = cast.filter(function (n) { return n !== mainName; });
-    const sideOffsets = [3, 16];   // vw
     // 移除不在 cast 里的图
     Array.from(wrap.children).forEach(function (el) {
         if (el.dataset && cast.indexOf(el.dataset.name) < 0) el.remove();
     });
-    const setStyle = function (img, isMain) {
+    const setStyle = function (img, isMain, sideIdx) {
         img.classList.toggle('main', isMain);
         img.classList.toggle('side', !isMain);
-        img.style.marginLeft = '0';
-        img.style.marginRight = '0';
+        img.classList.remove('side-far');
+        img.style.left = '';
+        img.style.right = '';
+        img.style.marginLeft = '';
+        img.style.marginRight = '';
         if (isMain) {
-            if (pos === 'center') {
-                img.style.left = '6%';
-                img.style.right = '0';
-                img.style.marginLeft = 'auto';
-                img.style.marginRight = 'auto';
-            } else if (pos === 'right') {
-                img.style.left = 'auto';
-                img.style.right = '5vw';
-            } else {
-                img.style.left = '5vw';
-                img.style.right = 'auto';
-            }
+            img.style.setProperty('--ac-pos-x', activeLayout.main);
         } else {
-            const i = Math.max(0, sides.indexOf(img.dataset.name));
-            let _mobile = false;
-            try { _mobile = window.innerWidth < 600; } catch (e) { /* ignore */ }
-            if (_mobile) {
-                // 窄屏：侧位立绘分到左右两边，避免挤在中间重叠
-                if (i % 2 === 0) { img.style.left = '1vw'; img.style.right = 'auto'; }
-                else { img.style.left = 'auto'; img.style.right = '1vw'; }
-            } else {
-                const off = sideOffsets[Math.min(i, sideOffsets.length - 1)];
-                if (pos === 'left') { img.style.left = 'auto'; img.style.right = off + 'vw'; }
-                else { img.style.left = off + 'vw'; img.style.right = 'auto'; }
-            }
+            const nx = activeLayout.sides[Math.min(Math.max(0, sideIdx), activeLayout.sides.length - 1)] || activeLayout.sides[0];
+            img.style.setProperty('--ac-pos-x', nx);
+            if (sideIdx >= 1) img.classList.add('side-far');
         }
     };
     cast.forEach(function (nm) {
         const isMain = (nm === mainName);
+        const sideIdx = isMain ? -1 : Math.max(0, sides.indexOf(nm));
         const emo = (isMain && speaker) ? st.spriteEmo[nm] : (st.spriteEmo[nm] || { zh: 'normal', en: 'neutral' });
         galResolveSprite(nm, emo).then(function (hit) {
             let img = Array.from(wrap.children).find(function (el) { return el.dataset && el.dataset.name === nm; });
@@ -7820,7 +7834,7 @@ function galUpdateSprite(speaker, segText, narration, forcedEmo) {
                     img.classList.toggle('avatar', !!hit.avatar);
                 }
             }
-            setStyle(img, isMain);
+            setStyle(img, isMain, sideIdx);
             img.classList.toggle('dim', narration ? true : !isMain);
         }).catch(function () { /* ignore */ });
     });

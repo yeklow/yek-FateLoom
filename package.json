@@ -1,6 +1,6 @@
 {
   "name": "yek-fateloom",
-  "version": "0.18.2",
+  "version": "0.19.0",
   "private": true,
   "type": "module",
   "description": "FateLoom (命运织机) — SillyTavern Galgame 演出扩展",
