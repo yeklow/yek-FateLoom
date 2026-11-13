@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
- * yek命运织机 v0.20.0 —— 酒馆助手（Tavern Helper）单文件版
+ * yek命运织机 v0.21.0 —— 酒馆助手（Tavern Helper）单文件版
  *
  * 用法：酒馆助手 → 脚本库 → 新建脚本 → 粘贴本文件全部内容 → 保存
  * 依赖：JS-Slash-Runner（酒馆助手）4.x
@@ -385,7 +385,7 @@ function galV2Resolve(segs, names) {
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const VERSION = '0.20.0';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
+const VERSION = '0.21.0';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -963,6 +963,7 @@ const DEFAULTS = {
     spriteMap: {},          // { 角色名: { url, t } } —— 面板里导入的立绘（优先使用）
     vnSpriteFallback: 'default', // 没有专属立绘时：default=用默认素材包 / none=不显示
     vnEmotionMode: 'ai',    // 表情识别：ai=按内容判情绪（像官方）/ keyword=关键词
+    vnEmoScope: 'segment',  // 表情变化：segment=每段一个表情（默认）/ beat=逐句
     spriteExpr: {},         // { 角色名: { en表情: { url, t } } } 表情差分
     envPool: [],            // [{ id, name, url, t }] 环境池
     envActive: '',          // 当前环境 id
@@ -4106,6 +4107,19 @@ function wireGalDisplaySettings() {
             }
             spEmo.value = String(settings().vnEmotionMode || 'ai');
         }
+        const spScope = $('ac-emo-scope');
+        if (spScope) {
+            if (!spScope._bound) {
+                spScope._bound = true;
+                spScope.addEventListener('change', function () {
+                    settings().vnEmoScope = String(spScope.value || 'segment');
+                    persist();
+                    toast('表情变化：' + (settings().vnEmoScope === 'segment' ? '整段（每段一个表情）' : '逐句'), null, 2500);
+                    try { if (state.gal) galRender(); } catch (e) { /* ignore */ }
+                });
+            }
+            spScope.value = String(settings().vnEmoScope || 'segment');
+        }
 }
 
 async function refreshOverview() {
@@ -7010,6 +7024,38 @@ function galHideEmoBadge() {
     try { const el = document.getElementById('ac-gal-emo-badge'); if (el) el.classList.remove('on'); } catch (e) { /* ignore */ }
 }
 // 应用某个节拍的表情（带动作微动画）
+// 整段表情：统计该段所有节拍的情绪，取出现最多的（平票取靠后的；若几乎全是 neutral 但有明确情绪则优先明确情绪）
+function galSegmentEmotion(tl, segIdx) {
+    try {
+        const info = tl && tl.byIdx && tl.byIdx[segIdx];
+        if (!info || !info.beats.length) return { zh: '正常', en: 'neutral' };
+        const items = [];
+        const counts = {};
+        for (let bi = 0; bi < info.beats.length; bi++) {
+            const emo = galBeatEmo(tl, segIdx, bi);
+            const en = String((emo && emo.en) || 'neutral');
+            items.push(emo || { zh: '正常', en: 'neutral' });
+            counts[en] = (counts[en] || 0) + 1;
+        }
+        let best = null, bestN = -1;
+        for (let bi = 0; bi < items.length; bi++) {
+            const en = String(items[bi].en || 'neutral');
+            const n = counts[en];
+            if (n > bestN || (n === bestN && bi === items.length - 1)) { best = items[bi]; bestN = n; }
+        }
+        if (best && String(best.en) === 'neutral') {
+            let alt = null, altN = 0;
+            for (let bi = 0; bi < items.length; bi++) {
+                const en = String(items[bi].en || 'neutral');
+                if (en === 'neutral') continue;
+                const n = counts[en];
+                if (n >= altN) { alt = items[bi]; altN = n; }
+            }
+            if (alt) best = alt;
+        }
+        return best || items[items.length - 1] || { zh: '正常', en: 'neutral' };
+    } catch (e) { return { zh: '正常', en: 'neutral' }; }
+}
 function galApplyBeatEmotion(name, emo, segText) {
     try {
         const st = state.gal;
@@ -7074,6 +7120,7 @@ function galApplyPendingBeat() {
 }
 function galQueueBeat(segIdx, bi) {
     try {
+        if (String(settings().vnEmoScope || 'segment') === 'segment') return;
         const st = state.gal;
         if (!st || st.i !== segIdx) return;
         st.pendingBeat = { segIdx: segIdx, bi: bi };
@@ -7086,6 +7133,7 @@ function galQueueBeat(segIdx, bi) {
 }
 function galTypeEmotionTick(segIdx, shown, total) {
     try {
+        if (String(settings().vnEmoScope || 'segment') === 'segment') return;
         const st = state.gal;
         if (!st || st.i !== segIdx) return;
         const tl = st.emoTimeline;
@@ -7117,6 +7165,11 @@ function galRefreshEmotionNow() {
         const i = st.i;
         const info = st.emoTimeline.byIdx && st.emoTimeline.byIdx[i];
         if (!info || !info.beats.length) return;
+        if (String(settings().vnEmoScope || 'segment') === 'segment') {
+            const nm = info.speaker || st.lastSpeaker || '';
+            try { galApplyBeatEmotion(nm, galSegmentEmotion(st.emoTimeline, i), st.segs[i]); } catch (e) { /* ignore */ }
+            return;
+        }
         const txt = document.getElementById('ac-gal-text');
         const typing = st.typing;
         let bi = 0;
@@ -7732,6 +7785,7 @@ function viewAssets() {
         '<select class="ac-input" id="ac-sprite-pos" style="width:128px"><option value="right-third">构图：右1/3（推荐）</option><option value="center">构图：居中</option><option value="left-third">构图：左1/3</option><option value="right">构图：靠右</option><option value="left">构图：靠左</option><option value="custom">构图：自定义</option></select>' +
         '<select class="ac-input" id="ac-sprite-fallback" style="width:150px"><option value="default">无立绘用默认素材</option><option value="none">无立绘不显示</option></select>' +
         '<select class="ac-input" id="ac-emo-mode" style="width:150px"><option value="ai">表情：AI 识别</option><option value="keyword">表情：关键词</option></select>' +
+        '<select class="ac-input" id="ac-emo-scope" style="width:168px"><option value="segment">表情变化：整段（推荐）</option><option value="beat">表情变化：逐句</option></select>' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8fa0a0"><input type="checkbox" id="ac-auto-reroll" /> 截断自动重roll</label>' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8fa0a0" title="让 AI 在每句台词前标注【角色名】，Galgame 立绘/姓名牌 100% 正确"><input type="checkbox" id="ac-speaker-tag" /> AI 标注说话人</label>' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8fa0a0" title="聊天正文里不显示【角色名】：前缀（只影响显示）"><input type="checkbox" id="ac-hide-chat-tags" /> 聊天隐藏标注</label>' +
@@ -8979,10 +9033,19 @@ function galRender() {
         if (st.sceneCast && st.sceneCast.length && _emoSpeaker && st.sceneCast.indexOf(_emoSpeaker) < 0) _emoSpeaker = st.sceneCast[0] || '';
     } catch (e) { /* ignore */ }
     if (_info && _info.beats.length) {
-        const _bi = settings().vnTypewriter ? 0 : (_info.beats.length - 1);
-        try { galApplyBeatEmotion(_emoSpeaker, galBeatEmo(_tl, i, _bi), st.segs[i]); } catch (e) { /* ignore */ }
-        st.lastBeatSeg = i;
-        st.lastBeatBi = _bi;
+        const _scope = (function () { try { return String(settings().vnEmoScope || 'segment'); } catch (e) { return 'segment'; } })();
+        if (_scope === 'segment') {
+            let _emoSeg = null;
+            try { _emoSeg = galSegmentEmotion(_tl, i); } catch (e) { _emoSeg = null; }
+            try { galApplyBeatEmotion(_emoSpeaker, _emoSeg || galBeatEmo(_tl, i, _info.beats.length - 1), st.segs[i]); } catch (e) { /* ignore */ }
+            st.lastBeatSeg = i;
+            st.lastBeatBi = -1;
+        } else {
+            const _bi = settings().vnTypewriter ? 0 : (_info.beats.length - 1);
+            try { galApplyBeatEmotion(_emoSpeaker, galBeatEmo(_tl, i, _bi), st.segs[i]); } catch (e) { /* ignore */ }
+            st.lastBeatSeg = i;
+            st.lastBeatBi = _bi;
+        }
     } else {
         try { galUpdateSprite(speaker, st.segs[i], !speaker); } catch (e) { /* ignore */ }
     }
