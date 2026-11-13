@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
- * yek命运织机 v0.21.0 —— 酒馆助手（Tavern Helper）单文件版
+ * yek命运织机 v0.21.1 —— 酒馆助手（Tavern Helper）单文件版
  *
  * 用法：酒馆助手 → 脚本库 → 新建脚本 → 粘贴本文件全部内容 → 保存
  * 依赖：JS-Slash-Runner（酒馆助手）4.x
@@ -385,7 +385,7 @@ function galV2Resolve(segs, names) {
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const VERSION = '0.21.0';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
+const VERSION = '0.21.1';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -6846,6 +6846,10 @@ function galBeatEmoLocal(text, seenNeutral, seed) {
     if (/(你|您)/.test(t)) cues.push('caring', 'approval');
     if (/(我们|一起|明天|以后)/.test(t)) cues.push('optimism', 'realization');
     if (/(对不起|抱歉|怪我)/.test(t)) cues.push('remorse');
+    // 完全没有任何情绪线索的旁白/动作段：判为平静，不要随机挑情绪（否则「睡着」这类旁白会被判成悲/怕）
+    if (!cues.length) {
+        for (const m of GAL_EMO_MAP) if (m.en === 'neutral') return { zh: m.zh, en: m.en, motion: '' };
+    }
     const pool = cues.concat(GAL_LOCAL_FALLBACK_POOL).filter(function (x) { return x !== 'sympathy'; });
     let h = 5381;
     const src = t + '§' + String(seed === undefined ? (seenNeutral.total || 0) : seed);
