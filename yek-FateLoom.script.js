@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
- * yek命运织机 v0.22.1 —— 酒馆助手（Tavern Helper）单文件版
+ * yek命运织机 v0.23.0 —— 酒馆助手（Tavern Helper）单文件版
  *
  * 用法：酒馆助手 → 脚本库 → 新建脚本 → 粘贴本文件全部内容 → 保存
  * 依赖：JS-Slash-Runner（酒馆助手）4.x
@@ -385,7 +385,7 @@ function galV2Resolve(segs, names) {
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const VERSION = '0.22.1';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
+const VERSION = '0.23.0';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -964,6 +964,7 @@ const DEFAULTS = {
     vnSpriteFallback: 'default', // 没有专属立绘时：default=用默认素材包 / none=不显示
     vnEmotionMode: 'ai',    // 表情识别：ai=按内容判情绪（像官方）/ keyword=关键词
     vnEmoScope: 'segment',  // 表情变化：segment=每段一个表情（默认）/ beat=逐句
+    vnEmoPick: 'random',    // 整段表情挑选：random=候选随机（默认，稀有优先）/ weighted=加权最高
     emoUsage: {},           // 28 种表情的使用计数（稀有度调度器用，跨消息累计）
     spriteExpr: {},         // { 角色名: { en表情: { url, t } } } 表情差分
     envPool: [],            // [{ id, name, url, t }] 环境池
@@ -4121,6 +4122,20 @@ function wireGalDisplaySettings() {
             }
             spScope.value = String(settings().vnEmoScope || 'segment');
         }
+        const spPick = $('ac-emo-pick');
+        if (spPick) {
+            if (!spPick._bound) {
+                spPick._bound = true;
+                spPick.addEventListener('change', function () {
+                    settings().vnEmoPick = String(spPick.value || 'random');
+                    try { if (typeof _galSegPickCache === 'object') for (const k in _galSegPickCache) delete _galSegPickCache[k]; } catch (e) { /* ignore */ }
+                    persist();
+                    toast('整段表情挑选：' + (settings().vnEmoPick === 'random' ? '候选随机（稀有优先）' : '加权最高'), null, 2500);
+                    try { if (state.gal) galRender(); } catch (e) { /* ignore */ }
+                });
+            }
+            spPick.value = String(settings().vnEmoPick || 'random');
+        }
 }
 
 async function refreshOverview() {
@@ -6946,12 +6961,14 @@ function galBeatEmoLocal(text, seenNeutral) {
         if (seenNeutral) seenNeutral.lastEmo = 'neutral';
         return { zh: '正常', en: 'neutral', motion: '' };
     }
+    const _cands = {};
+    for (const k in scores) if (scores[k] > 0) _cands[k] = scores[k];
     const pick = galSchedulerSelect(scores, isDialogue);
     if (seenNeutral) seenNeutral.lastEmo = pick;
     const hit = GAL_EMO_MAP.find(function (m) { return m.en === pick; });
     let motion = '';
     if (lex && lex.en === pick) motion = lex.motion || '';
-    return { zh: hit ? hit.zh : pick, en: pick, motion: motion };
+    return { zh: hit ? hit.zh : pick, en: pick, motion: motion, cands: _cands };
 }
 
 // 建时间轴（同步本地兜底 + 异步 AI 覆盖）
@@ -7130,35 +7147,114 @@ const GAL_AROUSAL_WEIGHT = {
     anger: 1.3, disgust: 1.3, fear: 1.3, desire: 1.1, joy: 1.0, grief: 1.0, love: 1.0,
     admiration: 1.0, annoyance: 1.0, nervousness: 1.0, confusion: 1.0,
 };
-// 整段聚合：台词权重 2.5、旁白 0.3；越靠后的节拍权重越高（峰终定律）；neutral 在有非 neutral 时没有投票权
+// ── 整段表情：候选集 + 段内随机挑选（稀有度加权），一段只出一个、同一段渲染稳定 ──
+function galSegmentDialogueInfo(info) {
+    let hasDialogue = false, dialogueOnly = false;
+    try {
+        const plain = String((info && info.plain) || '');
+        hasDialogue = /[“"「『]/.test(plain);
+        const nameTag = /^【[^】\n]{1,20}】/.test(plain);
+        const quoteStart = /[“"「『]/.test(plain);
+        const quoteEnd = /[”"」』]/.test(plain);
+        dialogueOnly = (nameTag || quoteStart) && quoteEnd;
+    } catch (e) { /* ignore */ }
+    return { hasDialogue: hasDialogue, dialogueOnly: dialogueOnly };
+}
+// 汇总该段所有节拍的候选情绪分数（台词 2.5x / 旁白 0.3x + 尾拍加权 + 唤醒度 + AI 置信度）
+function galSegmentCandidates(tl, segIdx) {
+    const info = tl && tl.byIdx && tl.byIdx[segIdx];
+    if (!info) return [];
+    const dlg = galSegmentDialogueInfo(info);
+    const cand = {};
+    for (let bi = 0; bi < info.beats.length; bi++) {
+        const text = String(info.beats[bi].text || '');
+        const isQuoteBeat = /[“"「『”"」』]/.test(text);
+        let beatWeight = 1.0;
+        if (dlg.hasDialogue) beatWeight *= (dlg.dialogueOnly || isQuoteBeat) ? 2.5 : 0.3;
+        const progress = (bi + 1) / info.beats.length;
+        beatWeight *= 0.7 + 0.6 * progress * progress;
+        const beatScores = {};
+        const local = info.locals && info.locals[bi];
+        if (local && local.cands) { for (const k in local.cands) if (local.cands[k] > 0) beatScores[k] = local.cands[k]; }
+        const id = 's' + segIdx + '_b' + bi;
+        if (tl.emoAi && tl.emoAi[id] && tl.emoAi[id].en) {
+            const a = tl.emoAi[id];
+            beatScores[a.en] = (beatScores[a.en] || 0) + 4.5 * (Number(a.conf) || 0.8);
+        }
+        let maxB = 0;
+        for (const k in beatScores) maxB = Math.max(maxB, beatScores[k]);
+        if (maxB <= 0) continue;
+        for (const k in beatScores) {
+            cand[k] = (cand[k] || 0) + (beatScores[k] / maxB) * beatWeight * (GAL_AROUSAL_WEIGHT[k] || 1.0);
+        }
+    }
+    const hasNonNeutral = Object.keys(cand).some(function (k) { return k !== 'neutral'; });
+    if (hasNonNeutral) delete cand.neutral;
+    let list = Object.keys(cand).filter(function (k) { return cand[k] > 0; }).sort(function (a, b) { return cand[b] - cand[a]; });
+    if (!list.length) return [];
+    const maxC = cand[list[0]];
+    // 只保留「分数足够接近最高分」的前 5 个候选，避免把不相关情绪放进随机池
+    list = list.filter(function (k) { return cand[k] >= maxC * 0.5; }).slice(0, 5);
+    return list.map(function (k) { return [k, cand[k]]; });
+}
+const _galSegPickCache = {};
+function galSeedRng(str) {
+    let h = 2166136261 >>> 0;
+    const s = String(str || '');
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    h = (h >>> 0) || 1;
+    return function () {
+        h ^= h << 13; h >>>= 0;
+        h ^= h >> 17; h >>>= 0;
+        h ^= h << 5; h >>>= 0;
+        return h / 4294967296;
+    };
+}
+// 加权最高（旧行为，保留为可选项）
+function galSegmentEmotionWeighted(tl, segIdx) {
+    try {
+        const cands = galSegmentCandidates(tl, segIdx);
+        if (!cands.length) return { zh: '正常', en: 'neutral' };
+        const en = cands[0][0];
+        const hit = GAL_EMO_MAP.find(function (m) { return m.en === en; });
+        return hit ? { zh: hit.zh, en: hit.en } : { zh: '正常', en: 'neutral' };
+    } catch (e) { return { zh: '正常', en: 'neutral' }; }
+}
+// 候选随机：按「稀有度」加权抽一个，同一段（同一条消息同一个 seg）结果稳定
 function galSegmentEmotion(tl, segIdx) {
     try {
-        const info = tl && tl.byIdx && tl.byIdx[segIdx];
-        if (!info || !info.beats.length) return { zh: '正常', en: 'neutral' };
-        const items = [];
-        for (let bi = 0; bi < info.beats.length; bi++) {
-            items.push({ text: String(info.beats[bi].text || ''), emo: galBeatEmo(tl, segIdx, bi) });
+        const cands = galSegmentCandidates(tl, segIdx);
+        if (!cands.length) return { zh: '正常', en: 'neutral' };
+        const pickMode = (function () { try { return String(settings().vnEmoPick || 'random'); } catch (e) { return 'random'; } })();
+        let best = cands[0][0];
+        if (pickMode !== 'weighted' && cands.length > 1) {
+            const key = String((tl && tl.key) || '') + '|' + segIdx + '|' + (tl && tl.emoAi ? 'ai' : 'local');
+            const cached = _galSegPickCache[key];
+            if (cached && cands.some(function (it) { return it[0] === cached; })) {
+                best = cached;
+            } else {
+                galSchedInit();
+                const total = Math.max(1, Object.keys(_emoSched.usage).reduce(function (s, k) { return s + (_emoSched.usage[k] || 0); }, 0));
+                const weights = cands.map(function (it) {
+                    const freq = (_emoSched.usage[it[0]] || 0) / total;
+                    const rarity = 1 + Math.max(0, 1 - freq * 10) * 1.8;
+                    return [it[0], Math.pow(it[1], 0.3) * rarity];
+                });
+                const sum = weights.reduce(function (s, w) { return s + w[1]; }, 0);
+                const rng = galSeedRng(key);
+                let r = rng() * sum;
+                let chosen = weights[0][0];
+                for (const w of weights) { r -= w[1]; if (r <= 0) { chosen = w[0]; break; } }
+                best = chosen;
+                _galSegPickCache[key] = best;
+                const keys = Object.keys(_galSegPickCache);
+                if (keys.length > 400) delete _galSegPickCache[keys[0]];
+                try { galSchedCommit(best); } catch (e) { /* ignore */ }
+            }
         }
-        const hasDialogue = items.some(function (it) { return /[“"「『]/.test(it.text); });
-        const anyNonNeutral = items.some(function (it) { return galBeatEmoToEn(it.emo) !== 'neutral'; });
-        const votes = {};
-        for (let idx = 0; idx < items.length; idx++) {
-            const it = items[idx];
-            const en = galBeatEmoToEn(it.emo);
-            if (en === 'neutral' && anyNonNeutral) continue;
-            let w = 1.0;
-            if (hasDialogue) w *= /[“"「『]/.test(it.text) ? 2.5 : 0.3;
-            const progress = (idx + 1) / items.length;
-            w *= 0.7 + 0.6 * progress * progress;
-            w *= (GAL_AROUSAL_WEIGHT[en] || 1.0);
-            votes[en] = (votes[en] || 0) + w;
-        }
-        let best = null, bestScore = -1;
-        for (const en in votes) { if (votes[en] > bestScore) { best = en; bestScore = votes[en]; } }
-        if (!best) return { zh: '正常', en: 'neutral' };
-        const m = GAL_EMO_MAP.find(function (x) { return x.en === best; });
-        return m ? { zh: m.zh, en: m.en } : { zh: '正常', en: 'neutral' };
-    } catch (e) { return { zh: '正常', en: 'neutral' }; }
+        const hit = GAL_EMO_MAP.find(function (m) { return m.en === best; });
+        return hit ? { zh: hit.zh, en: hit.en } : { zh: '正常', en: 'neutral' };
+    } catch (e) { return galSegmentEmotionWeighted(tl, segIdx); }
 }
 function galApplyBeatEmotion(name, emo, segText) {
     try {
@@ -7890,6 +7986,7 @@ function viewAssets() {
         '<select class="ac-input" id="ac-sprite-fallback" style="width:150px"><option value="default">无立绘用默认素材</option><option value="none">无立绘不显示</option></select>' +
         '<select class="ac-input" id="ac-emo-mode" style="width:150px"><option value="ai">表情：AI 识别</option><option value="keyword">表情：关键词</option></select>' +
         '<select class="ac-input" id="ac-emo-scope" style="width:168px"><option value="segment">表情变化：整段（推荐）</option><option value="beat">表情变化：逐句</option></select>' +
+        '<select class="ac-input" id="ac-emo-pick" style="width:190px"><option value="random">整段挑选：候选随机（推荐）</option><option value="weighted">整段挑选：加权最高</option></select>' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8fa0a0"><input type="checkbox" id="ac-auto-reroll" /> 截断自动重roll</label>' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8fa0a0" title="让 AI 在每句台词前标注【角色名】，Galgame 立绘/姓名牌 100% 正确"><input type="checkbox" id="ac-speaker-tag" /> AI 标注说话人</label>' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8fa0a0" title="聊天正文里不显示【角色名】：前缀（只影响显示）"><input type="checkbox" id="ac-hide-chat-tags" /> 聊天隐藏标注</label>' +
