@@ -6,7 +6,7 @@ import { getContext } from '../../../extensions.js';
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const VERSION = '0.19.0';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
+const VERSION = '0.20.0';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -570,7 +570,10 @@ const DEFAULTS = {
     vnTypeSpeed: 40,        // 打字机速度（字/秒）
     vnSprite: true,         // Galgame 立绘开关
     vnSpritePos: 'right-third', // 立绘构图：right-third(右1/3,默认)/left-third/center/right/left
-    vnSpriteSize: 132,      // 立绘高度（%），90~165
+    vnSpriteSize: 132,      // 立绘高度（%），90~200
+    vnSpriteX: 68,          // 立绘水平中心（%），自定义构图用
+    vnSpriteY: 0,           // 立绘上下偏移（vh）
+    vnUniformSprite: true,  // 自动统一立绘大小（按透明边裁剪后的实际人物高度归一）
     vnLayoutMigratedV2: false, // 旧默认构图（center/112）迁移标记
     vnAutoReroll: true,      // 检测到 AI 回复被截断时自动重roll（Galgame 里）
     vnAutoRerollMax: 2,      // 自动重roll 最多几次
@@ -3642,13 +3645,60 @@ function wireGalDisplaySettings() {
         if (spSize) {
             if (!spSize._bound) {
                 spSize._bound = true;
-                spSize.addEventListener('change', function () {
-                    settings().vnSpriteSize = Number(spSize.value) || 132;
-                    persist();
-                    try { if (state.gal) galRender(); } catch (e) { /* ignore */ }
+                spSize.addEventListener('input', function () {
+                    settings().vnSpriteSize = Math.max(90, Math.min(200, Number(spSize.value) || 132));
+                    const lab = $('ac-sprite-size-val'); if (lab) lab.textContent = Math.round(settings().vnSpriteSize) + '%';
+                    persist(); galLivePreview();
                 });
             }
-            spSize.value = String(settings().vnSpriteSize || 132);
+            spSize.value = String(Math.max(90, Math.min(200, Number(settings().vnSpriteSize) || 132)));
+            const lab0 = $('ac-sprite-size-val'); if (lab0) lab0.textContent = Math.round(Number(spSize.value)) + '%';
+        }
+        const bindXY = function (el, key, fmt, dflt) {
+            if (!el) return;
+            if (!el._bound) {
+                el._bound = true;
+                el.addEventListener('input', function () {
+                    settings()[key] = Number(el.value) || dflt;
+                    settings().vnSpritePos = 'custom';
+                    const posSel = $('ac-sprite-pos'); if (posSel) posSel.value = 'custom';
+                    const lab = $(el.id + '-val'); if (lab) lab.textContent = fmt(Number(el.value));
+                    persist(); galLivePreview();
+                });
+            }
+            el.value = String(Number(settings()[key] === undefined ? dflt : settings()[key]));
+            const lab = $(el.id + '-val'); if (lab) lab.textContent = fmt(Number(el.value));
+        };
+        bindXY($('ac-sprite-x'), 'vnSpriteX', function (v) { return Math.round(v) + '%'; }, 68);
+        bindXY($('ac-sprite-y'), 'vnSpriteY', function (v) { return Math.round(v) + 'vh'; }, 0);
+        const spUniform = $('ac-uniform-sprite');
+        if (spUniform) {
+            if (!spUniform._bound) {
+                spUniform._bound = true;
+                spUniform.addEventListener('change', function () {
+                    settings().vnUniformSprite = !!spUniform.checked;
+                    persist(); galLivePreview();
+                    toast('自动统一立绘大小：' + (spUniform.checked ? '开' : '关'), null, 2200);
+                });
+            }
+            spUniform.checked = settings().vnUniformSprite !== false;
+        }
+        const spReset = $('ac-sprite-reset');
+        if (spReset && !spReset._bound) {
+            spReset._bound = true;
+            spReset.addEventListener('click', function () {
+                const s = settings();
+                s.vnSpritePos = 'right-third'; s.vnSpriteX = 68; s.vnSpriteY = 0; s.vnSpriteSize = 132;
+                persist();
+                const posSel = $('ac-sprite-pos'); if (posSel) posSel.value = 'right-third';
+                const xEl = $('ac-sprite-x'); if (xEl) xEl.value = '68';
+                const yEl = $('ac-sprite-y'); if (yEl) yEl.value = '0';
+                const zEl = $('ac-sprite-size'); if (zEl) zEl.value = '132';
+                const xl = $('ac-sprite-x-val'); if (xl) xl.textContent = '68%';
+                const yl = $('ac-sprite-y-val'); if (yl) yl.textContent = '0vh';
+                const sl = $('ac-sprite-size-val'); if (sl) sl.textContent = '132%';
+                galLivePreview(); toast('已恢复默认构图', null, 2000);
+            });
         }
         const spFb = $('ac-sprite-fallback');
         if (spFb) {
@@ -5800,11 +5850,11 @@ function galStyle() {
         '#ac-gal-sprites{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}',
         '#ac-gal-sprites::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8vh;background:linear-gradient(to top,rgba(8,10,16,.30),transparent);z-index:4;pointer-events:none}',
         '#ac-gal-sprites.hide{display:none}',
-        '#ac-gal-sprites .ac-gal-sprite{position:absolute;left:var(--ac-pos-x,50%);right:auto;margin:0;bottom:calc(-1 * var(--ac-sprite-sink,44%));height:var(--ac-sprite-h,132%);max-width:56vw;object-fit:contain;object-position:bottom center;transform:translateX(-50%);transform-origin:50% 85%;filter:drop-shadow(0 0 2px rgba(255,255,255,.18)) drop-shadow(0 14px 30px rgba(8,14,26,.42));opacity:0;transition:opacity .32s ease,transform .38s cubic-bezier(.22,1,.36,1),filter .35s ease,left .42s cubic-bezier(.22,1,.36,1),height .38s ease,bottom .38s ease,mask-image .3s ease;mask-image:linear-gradient(to bottom,#000 0%,#000 90%,rgba(0,0,0,.6) 98%,transparent 100%);-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 90%,rgba(0,0,0,.6) 98%,transparent 100%)}',
+        '#ac-gal-sprites .ac-gal-sprite{position:absolute;left:var(--ac-pos-x,50%);right:auto;margin:0;bottom:calc(-1 * var(--ac-sprite-sink,44%));height:var(--ac-sprite-h,132%);max-width:var(--ac-sprite-maxw,56vw);object-fit:contain;object-position:bottom center;transform:translateX(-50%) translateY(var(--ac-sprite-dy,0vh));transform-origin:50% 85%;filter:drop-shadow(0 0 2px rgba(255,255,255,.18)) drop-shadow(0 14px 30px rgba(8,14,26,.42));opacity:0;transition:opacity .32s ease,transform .38s cubic-bezier(.22,1,.36,1),filter .35s ease,left .42s cubic-bezier(.22,1,.36,1),height .38s ease,bottom .38s ease,mask-image .3s ease;mask-image:linear-gradient(to bottom,#000 0%,#000 90%,rgba(0,0,0,.6) 98%,transparent 100%);-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 90%,rgba(0,0,0,.6) 98%,transparent 100%)}',
         '#ac-gal-sprites .ac-gal-sprite.on{opacity:1}',
-        '#ac-gal-sprites .ac-gal-sprite.main{z-index:3;transform:translateX(-50%);filter:brightness(1.02) contrast(1.02) saturate(1.05) drop-shadow(0 0 2px rgba(255,255,255,.2)) drop-shadow(0 16px 34px rgba(8,14,26,.45))}',
-        '#ac-gal-sprites .ac-gal-sprite.side{z-index:2;transform:translateX(-50%) scale(.90) translateY(2.5vh);filter:brightness(.70) saturate(.85) drop-shadow(0 6px 16px rgba(8,14,26,.40))}',
-        '#ac-gal-sprites .ac-gal-sprite.side.side-far{z-index:1;transform:translateX(-50%) scale(.84) translateY(4.5vh);filter:brightness(.58) saturate(.78) drop-shadow(0 6px 16px rgba(8,14,26,.36))}',
+        '#ac-gal-sprites .ac-gal-sprite.main{z-index:3;transform:translateX(-50%) translateY(var(--ac-sprite-dy,0vh));filter:brightness(1.02) contrast(1.02) saturate(1.05) drop-shadow(0 0 2px rgba(255,255,255,.2)) drop-shadow(0 16px 34px rgba(8,14,26,.45))}',
+        '#ac-gal-sprites .ac-gal-sprite.side{z-index:2;transform:translateX(-50%) translateY(calc(var(--ac-sprite-dy,0vh) + 2.5vh)) scale(.90);filter:brightness(.70) saturate(.85) drop-shadow(0 6px 16px rgba(8,14,26,.40))}',
+        '#ac-gal-sprites .ac-gal-sprite.side.side-far{z-index:1;transform:translateX(-50%) translateY(calc(var(--ac-sprite-dy,0vh) + 4.5vh)) scale(.84);filter:brightness(.58) saturate(.78) drop-shadow(0 6px 16px rgba(8,14,26,.36))}',
         '#ac-gal-sprites .ac-gal-sprite.dim{filter:brightness(.88) contrast(.99) saturate(.95) drop-shadow(0 10px 24px rgba(8,14,26,.32))}',
         '#ac-gal-sprites .ac-gal-sprite.side.dim{filter:brightness(.66) contrast(.97) saturate(.8) drop-shadow(0 8px 18px rgba(8,14,26,.34))}',
         '#ac-gal-sprites .ac-gal-sprite.avatar{bottom:auto;height:calc(var(--ac-sprite-h,70%) * .5);border-radius:20px;border:3px solid rgba(255,255,255,.85);box-shadow:0 16px 40px rgba(15,23,42,.32);object-fit:cover}',
@@ -5819,6 +5869,11 @@ function galStyle() {
         '#ac-gal-emo-badge{position:absolute;left:14px;top:64px;z-index:6;display:none;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;background:rgba(15,23,42,.55);color:#e2e8f0;font-size:12px;line-height:1.4;border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 4px 16px rgba(0,0,0,.22);pointer-events:none;letter-spacing:.3px}',
         '#ac-gal-emo-badge.on{display:inline-flex}',
         '#ac-gal-emo-badge b{color:#7dd3fc;font-weight:600}',
+        '#ac-gal-overlay.adjust-on #ac-gal-sprites{pointer-events:auto;cursor:grab}',
+        '#ac-gal-overlay.adjust-on .ac-gal-sprite.main{outline:2px dashed rgba(56,189,248,.8);outline-offset:-8px;cursor:grab}',
+        '#ac-gal-adjust-bar{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:7;display:none;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(15,23,42,.62);color:#e2e8f0;font-size:12px;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.18)}',
+        '#ac-gal-overlay.adjust-on #ac-gal-adjust-bar{display:flex}',
+        '#ac-gal-adjust-bar button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#e2e8f0;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}',
         '#ac-gal-emo-badge .src{opacity:.55;font-size:10px;margin-left:2px}',
     ].join('\n');
     document.head.appendChild(st);
@@ -5833,9 +5888,12 @@ function galOverlay() {
         ov.id = 'ac-gal-overlay';
         ov.innerHTML =
             '<div id="ac-gal-bg"></div><div id="ac-gal-shade"></div><div id="ac-gal-sprites"></div><div id="ac-gal-emo-badge"></div>' +
+            '<div id="ac-gal-adjust-bar"><span>拖动人物调整位置 · 滚轮/按钮调大小</span>' +
+            '<button id="ac-gal-adj-minus">− 小</button><button id="ac-gal-adj-plus">＋ 大</button><button id="ac-gal-adj-done">✓ 完成</button></div>' +
             '<div id="ac-gal-top"><b>Galgame 模式</b><span id="ac-gal-info" style="font-size:12px;color:#9fb3ad;margin-left:10px"></span><span class="sp"></span>' +
             '<button id="ac-gal-open-loom">🎛 织机</button>' +
             '<button id="ac-gal-charstate">📝 变化</button>' +
+            '<button id="ac-gal-adjust">🎯 调整</button>' +
             '<button id="ac-gal-backlog-btn">📜 回想</button>' +
             '<button id="ac-gal-prev">◀ 上一条</button>' +
             '<button id="ac-gal-stop" style="display:none;border-color:rgba(230,120,120,.7);color:#ffb4b4">■ 终止生成</button>' +
@@ -5861,6 +5919,7 @@ function galOverlay() {
             if (t.closest('#ac-gal-top') || t.closest('#ac-gal-input') || t.closest('#ac-gal-choice button')) return;
             if (t.closest('#ac-gal-backlog') || t.closest('#ac-gal-charstate-panel')) return;
             if (t.closest('summary') || t.closest('#ac-gal-text details') || t.closest('#ac-gal-text a')) return;
+            if (state.gal && state.gal.adjust) return;   // 调整模式：点击不推进
             galTap();
         });
         ov.querySelector('#ac-gal-close').addEventListener('click', function (ev) { ev.stopPropagation(); galClose(); });
@@ -5870,6 +5929,36 @@ function galOverlay() {
             galOpenCharState();
         });
         ov.querySelector('#ac-gal-charstate-close').addEventListener('click', function (ev) { ev.stopPropagation(); galCloseCharState(); });
+        ov.querySelector('#ac-gal-adjust').addEventListener('click', function (ev) { ev.stopPropagation(); galToggleAdjust(); });
+        ov.querySelector('#ac-gal-adj-minus').addEventListener('click', function (ev) { ev.stopPropagation(); galAdjustSize(-6); });
+        ov.querySelector('#ac-gal-adj-plus').addEventListener('click', function (ev) { ev.stopPropagation(); galAdjustSize(6); });
+        ov.querySelector('#ac-gal-adj-done').addEventListener('click', function (ev) { ev.stopPropagation(); galToggleAdjust(false); });
+        (function () {
+            const spWrap = ov.querySelector('#ac-gal-sprites');
+            let adj = null;
+            spWrap.addEventListener('pointerdown', function (ev) {
+                const st = state.gal;
+                if (!st || !st.adjust) return;
+                const img = ev.target && ev.target.closest ? ev.target.closest('.ac-gal-sprite.main') : null;
+                if (!img) return;
+                ev.preventDefault();
+                const s = settings();
+                adj = { x0: ev.clientX, y0: ev.clientY, sx: Number(s.vnSpriteX) || 68, sy: Number(s.vnSpriteY) || 0, w: window.innerWidth || 1, h: window.innerHeight || 1 };
+                try { img.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+            });
+            spWrap.addEventListener('pointermove', function (ev) {
+                if (!adj) return;
+                const s = settings();
+                s.vnSpriteX = Math.max(8, Math.min(92, adj.sx + (ev.clientX - adj.x0) / adj.w * 100));
+                s.vnSpriteY = Math.max(-15, Math.min(15, adj.sy + (ev.clientY - adj.y0) / adj.h * 100));
+                s.vnSpritePos = 'custom';
+                galUpdateAdjustHint();
+                galLivePreview();
+            });
+            const endDrag = function () { if (adj) { adj = null; try { persist(); } catch (e) { /* ignore */ } } };
+            spWrap.addEventListener('pointerup', endDrag);
+            spWrap.addEventListener('pointercancel', endDrag);
+        })();
         ov.querySelector('#ac-gal-open-loom').addEventListener('click', function (ev) {
             ev.stopPropagation();
             try { galClose(); } catch (e) { /* ignore */ }
@@ -5886,6 +5975,11 @@ function galOverlay() {
         // 滚轮：上滚回看上一段，下滚继续
         let _wheelAt = 0;
         ov.addEventListener('wheel', function (ev) {
+            if (state.gal && state.gal.adjust) {
+                ev.preventDefault();
+                if (Math.abs(ev.deltaY || 0) > 2) galAdjustSize(ev.deltaY < 0 ? 4 : -4);
+                return;
+            }
             if (document.getElementById('ac-gal-backlog')?.classList.contains('on')) return;
             const now = Date.now();
             if (now - _wheelAt < 220) return;
@@ -6118,6 +6212,111 @@ function galActionEmotion(text) {
     if (/[！!]$/.test(t)) { for (const m of GAL_EMO_MAP) if (m.en === 'excitement') return { zh: m.zh, en: m.en, motion: 'jump' }; }
     return null;
 }
+// ── 立绘实时预览 / Galgame 内调整模式 / 立绘大小自动归一 ──
+function galLivePreview() {
+    try {
+        clearTimeout(state._galPreviewTimer);
+        state._galPreviewTimer = setTimeout(function () {
+            try { if (state.gal && document.getElementById('ac-gal-overlay') && document.getElementById('ac-gal-overlay').classList.contains('on')) galRender(); } catch (e) { /* ignore */ }
+        }, 90);
+    } catch (e) { /* ignore */ }
+}
+function galUpdateAdjustHint() {
+    try {
+        const bar = document.getElementById('ac-gal-adjust-bar');
+        if (!bar) return;
+        const span = bar.querySelector('span');
+        if (!span) return;
+        const s = settings();
+        span.textContent = 'X ' + Math.round(Number(s.vnSpriteX) || 68) + '% · 上下 ' + Math.round(Number(s.vnSpriteY) || 0) + 'vh · 大小 ' + Math.round(Number(s.vnSpriteSize) || 132) + '%';
+    } catch (e) { /* ignore */ }
+}
+function galAdjustSize(delta) {
+    try {
+        const s = settings();
+        s.vnSpriteSize = Math.max(90, Math.min(200, (Number(s.vnSpriteSize) || 132) + Number(delta || 0)));
+        if (String(s.vnSpritePos) !== 'custom') {
+            s.vnSpritePos = 'custom';
+            s.vnSpriteX = Number(s.vnSpriteX) || 68;
+            s.vnSpriteY = Number(s.vnSpriteY) || 0;
+        }
+        persist();
+        galUpdateAdjustHint();
+        galLivePreview();
+    } catch (e) { /* ignore */ }
+}
+function galToggleAdjust(force) {
+    try {
+        const st = state.gal;
+        if (!st) return;
+        const on = (force === undefined) ? !st.adjust : !!force;
+        st.adjust = on;
+        const ov = document.getElementById('ac-gal-overlay');
+        if (ov) ov.classList.toggle('adjust-on', on);
+        const btn = document.getElementById('ac-gal-adjust');
+        if (btn) btn.textContent = on ? '🎯 完成' : '🎯 调整';
+        if (on) {
+            galUpdateAdjustHint();
+            try { galRender(); } catch (e) { /* ignore */ }
+        } else {
+            persist();
+            try { galRender(); } catch (e) { /* ignore */ }
+        }
+    } catch (e) { /* ignore */ }
+}
+// 立绘透明边裁剪 → 实际人物高度比例（用于自动统一大小）
+const _galSpriteNormCache = {};
+function galSpriteNormFromImage(url) {
+    const u = String(url || '');
+    if (!u) return Promise.resolve(null);
+    if (Object.prototype.hasOwnProperty.call(_galSpriteNormCache, u)) return Promise.resolve(_galSpriteNormCache[u]);
+    return new Promise(function (resolve) {
+        const im = new Image();
+        im.onload = function () {
+            try {
+                const W = im.naturalWidth || 1, H = im.naturalHeight || 1;
+                const cw = Math.min(160, W), ch = Math.max(1, Math.round(H * cw / W));
+                const cv = document.createElement('canvas');
+                cv.width = cw; cv.height = ch;
+                const cx = cv.getContext('2d');
+                cx.clearRect(0, 0, cw, ch);
+                cx.drawImage(im, 0, 0, cw, ch);
+                const data = cx.getImageData(0, 0, cw, ch).data;
+                let top = -1, bottom = -1;
+                for (let y = 0; y < ch; y++) {
+                    let has = false;
+                    for (let x = 0; x < cw; x++) {
+                        if (data[(y * cw + x) * 4 + 3] > 16) { has = true; break; }
+                    }
+                    if (has) { if (top < 0) top = y; bottom = y; }
+                }
+                if (top < 0 || bottom <= top) { _galSpriteNormCache[u] = null; resolve(null); return; }
+                const ratio = { top: top / ch, bottom: (bottom + 1) / ch, h: (bottom + 1 - top) / ch };
+                _galSpriteNormCache[u] = ratio;
+                resolve(ratio);
+            } catch (e) { _galSpriteNormCache[u] = null; resolve(null); }
+        };
+        im.onerror = function () { _galSpriteNormCache[u] = null; resolve(null); };
+        im.src = u;
+    });
+}
+function galApplySpriteNorm(img, url) {
+    try {
+        if (!img) return;
+        if (settings().vnUniformSprite === false) { img.style.scale = ''; img.style.transformOrigin = ''; return; }
+        galSpriteNormFromImage(url).then(function (ratio) {
+            try {
+                if (!ratio || img.getAttribute('src') !== url) return;
+                const F = 0.90;                 // 人物实际高度占元素高度的目标比例
+                let k = F / ratio.h;
+                k = Math.max(0.72, Math.min(1.8, k));
+                img.style.transformOrigin = '50% ' + Math.round(ratio.bottom * 100) + '%';
+                img.style.scale = String(Math.round(k * 1000) / 1000);
+            } catch (e) { /* ignore */ }
+        }).catch(function () { /* ignore */ });
+    } catch (e) { /* ignore */ }
+}
+
 // ── AI 表情识别（像官方 expressions 一样按内容判情绪）：异步、带缓存、不阻塞显示 ──
 const _emoAiCache = {};
 let _emoAiTimer = null;
@@ -7151,8 +7350,7 @@ function viewAssets() {
         '<button class="ac-btn" id="ac-tw-toggle">打字机：开</button>' +
         '<select class="ac-input" id="ac-tw-speed" style="width:92px"><option value="20">慢</option><option value="40">中</option><option value="80">快</option></select>' +
         '<button class="ac-btn" id="ac-sprite-toggle">立绘：开</button>' +
-        '<select class="ac-input" id="ac-sprite-pos" style="width:128px"><option value="right-third">构图：右1/3（推荐）</option><option value="center">构图：居中</option><option value="left-third">构图：左1/3</option><option value="right">构图：靠右</option><option value="left">构图：靠左</option></select>' +
-        '<select class="ac-input" id="ac-sprite-size" style="width:112px"><option value="100">小</option><option value="116">中</option><option value="132">大（推荐）</option><option value="148">特大</option><option value="160">超大</option></select>' +
+        '<select class="ac-input" id="ac-sprite-pos" style="width:128px"><option value="right-third">构图：右1/3（推荐）</option><option value="center">构图：居中</option><option value="left-third">构图：左1/3</option><option value="right">构图：靠右</option><option value="left">构图：靠左</option><option value="custom">构图：自定义</option></select>' +
         '<select class="ac-input" id="ac-sprite-fallback" style="width:150px"><option value="default">无立绘用默认素材</option><option value="none">无立绘不显示</option></select>' +
         '<select class="ac-input" id="ac-emo-mode" style="width:150px"><option value="ai">表情：AI 识别</option><option value="keyword">表情：关键词</option></select>' +
         '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8fa0a0"><input type="checkbox" id="ac-auto-reroll" /> 截断自动重roll</label>' +
@@ -7161,6 +7359,15 @@ function viewAssets() {
         '<select class="ac-input" id="ac-auto-reroll-max" style="width:76px"><option value="1">1 次</option><option value="2">2 次</option><option value="3">3 次</option></select>' +
         '<select class="ac-input" id="ac-stall-seconds" style="width:120px" title="连续多少秒没有新字才判定为截断/卡住"><option value="5">无字 5 秒算截断</option><option value="6">6 秒</option><option value="8">8 秒</option><option value="10">10 秒</option></select>' +
         '<select class="ac-input" id="ac-reroll-delay" style="width:132px" title="自动重新生成前等多久（让服务端冷却，降低再次截断概率）"><option value="5">等 5 秒再重roll</option><option value="10">10 秒</option><option value="15">15 秒</option><option value="20">20 秒</option><option value="30">30 秒</option></select>' +
+        '</div></div>';
+    h += '<div class="ac-card"><div class="h">🎯 自定义立绘位置 / 大小</div>' +
+        '<div class="hint">拖滑杆实时生效（Galgame 开着的话马上能看到）。也可以在 Galgame 顶栏点「🎯 调整」，直接拖动人物、滚轮调大小。</div>' +
+        '<div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">' +
+        '<label style="font-size:12px;color:#8fa0a0">水平位置 <span id="ac-sprite-x-val">68%</span><input type="range" id="ac-sprite-x" min="8" max="92" step="1" style="width:100%"></label>' +
+        '<label style="font-size:12px;color:#8fa0a0">上下偏移 <span id="ac-sprite-y-val">0vh</span><input type="range" id="ac-sprite-y" min="-15" max="15" step="1" style="width:100%"></label>' +
+        '<label style="font-size:12px;color:#8fa0a0">立绘高度 <span id="ac-sprite-size-val">132%</span><input type="range" id="ac-sprite-size" min="90" max="200" step="1" style="width:100%"></label>' +
+        '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8fa0a0"><input type="checkbox" id="ac-uniform-sprite" /> 自动统一立绘大小（按人物实际像素高度缩放）</label>' +
+        '<div><button class="ac-btn" id="ac-sprite-reset">恢复默认（右1/3 · 132%）</button></div>' +
         '</div></div>';
     h += '<div class="ac-card"><div class="h">环境池（背景素材，全局共享）</div>' +
         '<div class="hint">所有角色卡共用；开自动切换后，正文出现素材名（如「卧室」）会自动切图。</div>' +
@@ -7742,10 +7949,10 @@ function galUpdateSprite(speaker, segText, narration, forcedEmo) {
     if (cast.indexOf(mainName) < 0) cast.push(mainName);
     // ── 构图（Gemini 建议的黄金三分站位）：主立绘右 1/3，配角左/中左，第三远景 ──
     let pos = String(s.vnSpritePos || 'right-third');
-    if (!/^(right-third|left-third|right|left|center)$/.test(pos)) pos = 'right-third';
+    if (!/^(right-third|left-third|right|left|center|custom)$/.test(pos)) pos = 'right-third';
     const _rawSize = Number(s.vnSpriteSize) || 132;
-    let h = Math.max(90, Math.min(165, _rawSize));
-    const sink = Math.round(Math.max(8, Math.min(68, (h - 84) * 0.92)));
+    let h = Math.max(90, Math.min(200, _rawSize));
+    const sink = Math.round(Math.max(8, Math.min(110, (h - 84) * 0.92)));
     wrap.style.setProperty('--ac-sprite-h', h + '%');
     wrap.style.setProperty('--ac-sprite-sink', sink + '%');
     let _isMobile = false;
@@ -7768,7 +7975,20 @@ function galUpdateSprite(speaker, segText, narration, forcedEmo) {
         'left': { main: '42vw', sides: ['78vw', '18vw'] },
         'center': { main: '50vw', sides: ['18vw', '82vw'] },
     };
-    const activeLayout = (_isMobile ? MOBILE_LAYOUT_MAP : LAYOUT_MAP)[pos] || LAYOUT_MAP['right-third'];
+    let _mainX = 68, _sideXs = [26, 46];
+    if (pos === 'custom') {
+        _mainX = Math.max(8, Math.min(92, Number(s.vnSpriteX) === undefined ? 68 : Number(s.vnSpriteX)));
+        const _toLeft = _mainX >= 50;
+        _sideXs = _toLeft ? [_mainX - 42, _mainX - 22] : [_mainX + 42, _mainX + 22];
+        _sideXs = _sideXs.map(function (x) { return Math.max(6, Math.min(94, x)); });
+    } else {
+        const _map = (_isMobile ? MOBILE_LAYOUT_MAP : LAYOUT_MAP)[pos] || LAYOUT_MAP['right-third'];
+        _mainX = parseFloat(_map.main);
+        _sideXs = _map.sides.map(function (x) { return parseFloat(x); });
+    }
+    const activeLayout = { main: _mainX + 'vw', sides: _sideXs.map(function (x) { return x + 'vw'; }) };
+    wrap.style.setProperty('--ac-sprite-dy', (Math.max(-15, Math.min(15, Number(s.vnSpriteY) || 0))) + 'vh');
+    wrap.style.setProperty('--ac-sprite-maxw', h >= 190 ? '88vw' : (h >= 150 ? '74vw' : '56vw'));
     const sides = cast.filter(function (n) { return n !== mainName; });
     // 移除不在 cast 里的图
     Array.from(wrap.children).forEach(function (el) {
@@ -7804,6 +8024,7 @@ function galUpdateSprite(speaker, segText, narration, forcedEmo) {
                 img.alt = String(nm);
                 img.src = hit.url;
                 wrap.appendChild(img);
+                try { galApplySpriteNorm(img, hit.url); } catch (e) { /* ignore */ }
                 try { void img.offsetWidth; } catch (e) { /* ignore */ }
                 img.classList.add('on');
             } else if (img.getAttribute('src') !== hit.url) {
@@ -7823,6 +8044,7 @@ function galUpdateSprite(speaker, segText, narration, forcedEmo) {
                     setTimeout(function () {
                         try {
                             img.src = hit.url;
+                            try { galApplySpriteNorm(img, hit.url); } catch (e1) { /* ignore */ }
                             img.classList.toggle('avatar', !!hit.avatar);
                             const back = function () { try { img.style.opacity = '1'; } catch (e0) { /* ignore */ } };
                             img.addEventListener('load', back, { once: true });
@@ -8437,6 +8659,7 @@ function galRender() {
         : (last
             ? (adv.isAdvance && adv.content ? '点击这句推进剧情（或在下面自己输入）' : '正文到此结束，在下面输入下一步')
             : ('▼ 点击继续　' + (i + 1) + ' / ' + st.segs.length));
+    if (st.adjust && hint) { try { hint.textContent = '🎯 拖动人物调整位置 · 滚轮/按钮调大小'; } catch (e) { /* ignore */ } }
     galUpdateStopBtn();
     const prevBtn = document.getElementById('ac-gal-prev');
     if (prevBtn) {
@@ -9609,7 +9832,7 @@ try {
         }
     }, true);
     window.__acDiag = galDiagSnapshot;
-    window.__acHook = { diag: galDiagSnapshot, tagCheck: galCheckMissingTags, hideTags: galHideChatSpeakerTags };
+    window.__acHook = { diag: galDiagSnapshot, tagCheck: galCheckMissingTags, hideTags: galHideChatSpeakerTags, norm: function (u) { try { return galSpriteNormFromImage(u); } catch (e) { return null; } } };
 } catch (e) { /* ignore */ }
 
 // ── 漏标检测：正文里有多少句台词没有【角色名】标注 ──
