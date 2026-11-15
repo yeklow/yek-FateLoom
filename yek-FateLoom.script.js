@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
- * yek命运织机 v0.24.1 —— 酒馆助手（Tavern Helper）单文件版
+ * yek命运织机 v0.24.4 —— 酒馆助手（Tavern Helper）单文件版
  *
  * 用法：酒馆助手 → 脚本库 → 新建脚本 → 粘贴本文件全部内容 → 保存
  * 依赖：JS-Slash-Runner（酒馆助手）4.x
@@ -385,7 +385,7 @@ function galV2Resolve(segs, names) {
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const VERSION = '0.24.1';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
+const VERSION = '0.24.4';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -965,7 +965,7 @@ const DEFAULTS = {
     vnEmotionMode: 'ai',    // 表情识别：ai=按内容判情绪（像官方）/ keyword=关键词
     vnEmoScope: 'segment',  // 表情变化：segment=每段一个表情（默认）/ beat=逐句
     vnEmoPick: 'random',    // 整段表情挑选：random=候选随机（默认，稀有优先）/ weighted=加权最高
-    emoUsage: {},           // 28 种表情的使用计数（稀有度调度器用，跨消息累计）
+    emoUsage: {},           // 22 张立绘表情的使用计数（稀有度调度器用，跨消息累计）
     spriteExpr: {},         // { 角色名: { en表情: { url, t } } } 表情差分
     envPool: [],            // [{ id, name, url, t }] 环境池
     envActive: '',          // 当前环境 id
@@ -6556,7 +6556,6 @@ const GAL_PALETTE_ALIAS = {
     begging: ['begging', 'desire'], daze: ['daze', 'realization'], indulgence: ['indulgence', 'love'],
     climax: ['climax', 'excitement'], afterglow: ['afterglow', 'relief'], exhaustion: ['exhaustion', 'disappointment'],
     // 旧 28 张英文文件 → 新 22 张的兜底关系（新中文文件存在时优先用新文件）
-    joy_old: [],
 };
 // 运行时精灵兜底：新表情没有专属文件时，借用最接近的旧英文名文件
 const GAL_SPRITE_FALLBACK = {
@@ -6617,6 +6616,8 @@ function galSpriteEmotion(text) {
     const findEmo = function (raw) {
         const s0 = String(raw || '').trim().toLowerCase();
         if (!s0) return null;
+        const pal = GAL_PALETTE_BY_ZH[String(raw || '').trim()] || GAL_PALETTE_BY_EN[s0];
+        if (pal) return { zh: pal.zh, en: pal.en };
         for (const m of GAL_EMO_MAP) {
             if (m.zh === raw || String(m.zh) === String(raw)) return { zh: m.zh, en: m.en };
             if (m.en === s0) return { zh: m.zh, en: m.en };
@@ -6634,7 +6635,7 @@ function galSpriteEmotion(text) {
         if (hit) return hit;
     }
     // 2) 括号里的表演提示：（微笑）/（叹气）/（脸红）
-    const parenRe = /[（(]\s*(微笑|苦笑|笑|大笑|怒|生气|哭|流泪|叹气|惊讶|震惊|害羞|脸红|紧张|害怕|兴奋|得意|疑惑|无语|无奈|温柔|冷淡|平静|沉默)\s*[）)]/g;
+    const parenRe = /[（(]\s*(微笑|苦笑|笑|大笑|怒|生气|哭|流泪|叹气|惊讶|震惊|害羞|脸红|紧张|害怕|兴奋|得意|疑惑|无语|无奈|温柔|冷淡|平静|沉默|爱|欲|烦|悲|惊|怕|动情|媚|喘息|索求|失神|沉溺|高潮|余韵|虚脱|满足)\s*[）)]/g;
     let mp;
     while ((mp = parenRe.exec(t))) {
         const hit = findEmo(mp[1]);
@@ -6835,10 +6836,10 @@ function galEmotionAi(text) {
     if (!t) return Promise.resolve(null);
     const key = t.slice(0, 120);
     if (Object.prototype.hasOwnProperty.call(_emoAiCache, key)) return Promise.resolve(_emoAiCache[key]);
-    const labels = GAL_EMO_MAP.map(function (m) { return m.en; }).concat(['neutral']);
+    const labels = GAL_PALETTE.map(function (m) { return m.en; });
     const quotes = (t.match(/[“"]([^”"]{2,120})[”"]/g) || []).join(' ');
     const sample = (quotes ? quotes : t).slice(0, 240);
-    const prompt = '只输出一个英文单词，不要标点、不要解释。判断下面这段角色台词对应的情绪，从这些标签里选最接近的一个（除非真的完全平淡，否则不要选 neutral）：' + labels.join(', ') + '。\n台词：' + sample;
+    const prompt = '只输出一个标签，不要标点、不要解释。判断下面这段角色台词对应的情绪，从这些标签里选最接近的一个（中英文均可；除非真的完全平淡，否则不要选 neutral）：' + GAL_PALETTE.map(function (m) { return m.zh + '(' + m.en + ')'; }).join('、') + '。\n台词：' + sample;
     return callLLM(prompt, { maxTokens: 400, timeout: 30 }).then(function (raw) {
         const text = String(raw || '');
         // 1) 英文标签（优先取整词）
@@ -6846,15 +6847,16 @@ function galEmotionAi(text) {
         let hit = null;
         for (const w of words) { if (labels.indexOf(w) >= 0) { hit = w; break; } }
         if (hit) {
-            for (const m of GAL_EMO_MAP) { if (m.en === hit) { _emoAiCache[key] = { zh: m.zh, en: m.en }; return _emoAiCache[key]; } }
+            const p0 = galProjectLabel(hit);
+            if (p0) { _emoAiCache[key] = { zh: p0.zh, en: p0.en }; return _emoAiCache[key]; }
         }
         // 2) 中文标签（有些模型会回中文）
-        for (const m of GAL_EMO_MAP) {
-            if (text.indexOf(m.zh) >= 0) { _emoAiCache[key] = { zh: m.zh, en: m.en }; return _emoAiCache[key]; }
+        for (const p0 of GAL_PALETTE) {
+            if (text.indexOf(p0.zh) >= 0) { _emoAiCache[key] = { zh: p0.zh, en: p0.en }; return _emoAiCache[key]; }
         }
         if (/neutral|平静|无表情|平淡/i.test(text)) {
             // AI 判成平淡时，如果关键词能读出情绪就优先关键词（避免表情变化太少）
-            const kw = galSpriteEmotion(t);
+            const kw = galProjectEmotion(galSpriteEmotion(t), t);
             if (kw && kw.en && kw.en !== 'neutral') { _emoAiCache[key] = kw; return kw; }
             _emoAiCache[key] = { zh: '平静', en: 'neutral' };
             return _emoAiCache[key];
@@ -6963,7 +6965,17 @@ const _emoSched = { usage: null, step: 0, executed: 0, last: '', lastAt: {} };
 function galSchedInit() {
     if (_emoSched.usage) return;
     _emoSched.usage = {};
-    try { const u = settings().emoUsage; if (u && typeof u === 'object') _emoSched.usage = u; } catch (e) { /* ignore */ }
+    try {
+        const u = settings().emoUsage;
+        if (u && typeof u === 'object') {
+            const migrated = {};
+            for (const k in u) {
+                const p = galProjectEmotion({ en: k }, '');
+                migrated[p.en] = (migrated[p.en] || 0) + (Number(u[k]) || 0);
+            }
+            _emoSched.usage = migrated;
+        }
+    } catch (e) { /* ignore */ }
 }
 function galSchedPersist() {
     try { settings().emoUsage = _emoSched.usage; persist(); } catch (e) { /* ignore */ }
@@ -7020,9 +7032,17 @@ function galBeatEmoLocal(text, seenNeutral) {
     const scores = {};
     const add = function (k, v) { if (k) scores[k] = (scores[k] || 0) + v; };
     const isDialogue = /[“"「『]/.test(t);
-    const isTagged = /【\s*表情\s*[：:]|[\[［]\s*表情\s*[：:]|[（(]\s*(微笑|苦笑|笑|大笑|怒|生气|哭|流泪|叹气|惊讶|震惊|害羞|脸红|紧张|害怕|兴奋|得意|疑惑|无语|无奈|温柔|冷淡|平静|沉默)\s*[）)]/.test(t);
+    const isTagged = /【\s*表情\s*[：:]|[\[［]\s*表情\s*[：:]|[（(]\s*(微笑|苦笑|笑|大笑|怒|生气|哭|流泪|叹气|惊讶|震惊|害羞|脸红|紧张|害怕|兴奋|得意|疑惑|无语|无奈|温柔|冷淡|平静|沉默|爱|欲|烦|悲|惊|怕|动情|媚|喘息|索求|失神|沉溺|高潮|余韵|虚脱|满足)\s*[）)]/.test(t);
     if (isTagged) {
-        try { const q = galSpriteEmotion(t); if (q && q.en) add(q.en, 5.0); } catch (e) { /* ignore */ }
+        try {
+            const q = galSpriteEmotion(t);
+            if (q && q.en) {
+                if (GAL_PALETTE_BY_EN[q.en]) {
+                    return { zh: q.zh, en: q.en, motion: q.motion || '', src: 'local', cands: (function () { const c = {}; c[q.en] = 8.0; return c; })() };
+                }
+                add(q.en, 5.0);
+            }
+        } catch (e) { /* ignore */ }
     }
     // 关键词命中计数（每个词 1.2，最多 3.6，防止长段单类刷分）
     for (const m of GAL_EMO_MAP) {
@@ -7133,7 +7153,7 @@ function galBeatEmo(tl, segIdx, beatIdx) {
             const localEn = String(local.en || 'neutral');
             const conf = Number(a.conf) || 0.8;
             // 防幻觉：纯旁白 + 本地无表情，AI 给强负面 -> 判平静
-            if (!isDialogue && localEn === 'neutral' && ['fear', 'grief', 'anger', 'remorse', 'disgust'].indexOf(a.en) >= 0) {
+            if (!isDialogue && localEn === 'neutral' && ['fear', 'sadness', 'anger', 'annoyance'].indexOf(a.en) >= 0) {
                 return { zh: '平静', en: 'neutral', motion: '', src: 'ai' };
             }
             if (conf >= 0.55 || localEn === 'neutral') {
@@ -7190,12 +7210,12 @@ function galFetchEmoTimeline(entries, cacheKey) {
             '你是视觉小说(Galgame)演出导演。为下面每个分句标注「画面主角此刻的立绘表情」。',
             '可选表情（只能选这些标签，中文和英文都行）：' + labelPairs + '。',
             '导演铁律：',
-            '1. 严禁滥用 neutral/desire：本批 neutral ≤15%；调戏/坏笑/逗弄 -> amusement 或 pride（不要用 joy）；终于完成/松口气 -> relief；盘算明天/约定以后 -> optimism；傲娇/被夸奖 -> embarrassment；鄙视/嫌弃 -> disgust/annoyance；自责 -> remorse；落空 -> disappointment；恍然大悟 -> realization。',
-            '2. 纯环境描写、睡着、无情绪动作（例如「他睡着了」「走进房间」）-> 必须 neutral，绝不可乱贴 fear/sadness/anger。',
-            '3. 本批尽量使用 ≥6 种不同标签，同一标签不能连续超过 2 句；动作/神态也要推断角色脸上的表情。',
+            '1. 严禁滥用 平静(neutral)/欲(desire)：本批 平静 不超过 15%；调戏/坏笑/逗弄 -> 笑(joy) 或 得意(pride)；终于完成/松口气 -> 满足(satisfaction)；盘算明天/约定以后 -> 动情(arousal)；傲娇/被夸奖 -> 羞(embarrassment)；鄙视/嫌弃 -> 烦(annoyance)；自责/落空 -> 悲(sadness)；恍然大悟 -> 惊(surprise)。',
+            '2. 纯环境描写、睡着、无情绪动作（例如「他睡着了」「走进房间」）-> 必须 平静(neutral)，绝不可乱贴 怕/悲/怒。',
+            '3. 本批尽量使用 ≥6 种不同标签，同一标签不能连续超过 2 句；动作/神态也要推断角色脸上的表情。情欲场景可用 动情/媚/喘息/索求/失神/沉溺/高潮/余韵/虚脱/满足。',
             '4. 情绪强烈时给动作标记 m：jump(雀跃/惊吓) / sink(失落/害羞低头) / shake(发抖/愤怒)，否则 none。',
             '输入格式：每行 = id|说话人|句子（带中文引号的是台词，优先按台词判）。',
-            '只输出合法 JSON 对象，不要代码块、不要解释。格式：{"s0_b0":["amusement",0.9],"s0_b1":["caring",0.8]}',
+            '只输出合法 JSON 对象，不要代码块、不要解释。格式：{"s0_b0":["joy",0.9],"s0_b1":["love",0.8]}',
             '分句列表：',
             lines
         ].join('\n');
@@ -7531,6 +7551,11 @@ function galSpriteUrls(name, emo) {
     try {
         if (String(settings().vnSpriteFallback || 'default') !== 'none') {
             add(base + '_default/' + encodeURIComponent(en));
+            const _fb3 = GAL_SPRITE_FALLBACK[en];
+            if (_fb3 && _fb3 !== en) add(base + '_default/' + encodeURIComponent(_fb3));
+            for (const a of (GAL_PALETTE_ALIAS[en] || [])) {
+                if (a !== en) add(base + '_default/' + encodeURIComponent(a));
+            }
             add(base + '_default/neutral');
         }
     } catch (e) {
@@ -7767,6 +7792,17 @@ const GAL_EMO_ALIAS = {
     remorse: ['remorse', '后悔', '懊恼', '愧疚', '歉意'],
     sadness: ['sadness', '哭', '难过', '伤心', '泪', '哭泣'],
     surprise: ['surprise', '惊', '惊讶', '震惊', '吃惊', '意外'],
+    // 22 张新表情（zip 里的中文文件名也认）
+    arousal: ['arousal', '动情', '情动', '发情'],
+    flirt: ['flirt', '媚', '媚态', '撩人'],
+    panting: ['panting', '喘息', '娇喘'],
+    begging: ['begging', '索求', '哀求', '求饶'],
+    daze: ['daze', '失神', '恍惚'],
+    indulgence: ['indulgence', '沉溺', '沉沦'],
+    climax: ['climax', '高潮', '绝顶'],
+    afterglow: ['afterglow', '余韵', '余波'],
+    exhaustion: ['exhaustion', '虚脱', '脱力'],
+    satisfaction: ['satisfaction', '满足', '餍足'],
 };
 function galEmotionFromFilename(fn) {
     let base = String(fn || '').split('/').pop().replace(/\.[^.]+$/, '').toLowerCase().trim();
@@ -8299,7 +8335,7 @@ function renderAssetChars() {
                             const lab = String((it && it.label) || '').toLowerCase();
                             if (lab) have[lab] = String((it && it.path) || '');
                         }
-                        const neutral = have['neutral'] || have['normal'] || '';
+                        const neutral = have['neutral'] || have['normal'] || have['平静'] || '';
                         if (neutral && row.dataset.hasbase !== '1') {
                             const thumb = row.querySelector('div[style*="width:46px"]');
                             if (thumb) thumb.innerHTML = '<img src="' + esc(neutral) + '" style="width:100%;height:100%;object-fit:contain">';
