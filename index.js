@@ -6,7 +6,7 @@ import { getContext } from '../../../extensions.js';
 const MODULE = 'AUTO-Character';   // 设置存储键，不要改（改了会丢配置）
 const TITLE = 'yek命运织机';       // 界面显示名
 const SHORT = '命运织机';
-const VERSION = '0.23.0';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
+const VERSION = '0.24.1';   // 和 manifest.json 保持一致，方便用户确认装的是哪版
 const ctx = getContext();   // 事件源之类不会变的东西用这个
 // 注意：酒馆的 getContext() 每次返回新对象，characterId / chat 都是快照。
 // 会随「换角色卡 / 换聊天」变化的字段必须每次现取，否则一直是旧值。
@@ -6131,6 +6131,107 @@ const GAL_EMO_MAP = [
     { zh: '后悔', en: 'remorse', re: /后悔|懊悔|愧疚|歉意/ },
     { zh: '失望', en: 'disappointment', re: /失望|沮丧/ },
 ];
+
+// ── 用户自定义立绘表情表（22 张）：识别层仍是上面的 28 类，显示层投影到这里 ──
+const GAL_PALETTE = [
+    { zh: '平静', en: 'neutral' }, { zh: '笑', en: 'joy' }, { zh: '爱', en: 'love' }, { zh: '欲', en: 'desire' },
+    { zh: '羞', en: 'embarrassment' }, { zh: '怒', en: 'anger' }, { zh: '烦', en: 'annoyance' }, { zh: '悲', en: 'sadness' },
+    { zh: '惊', en: 'surprise' }, { zh: '怕', en: 'fear' }, { zh: '得意', en: 'pride' }, { zh: '疑惑', en: 'confusion' },
+    { zh: '动情', en: 'arousal' }, { zh: '媚', en: 'flirt' }, { zh: '喘息', en: 'panting' }, { zh: '索求', en: 'begging' },
+    { zh: '失神', en: 'daze' }, { zh: '沉溺', en: 'indulgence' }, { zh: '高潮', en: 'climax' }, { zh: '余韵', en: 'afterglow' },
+    { zh: '虚脱', en: 'exhaustion' }, { zh: '满足', en: 'satisfaction' },
+];
+const GAL_PALETTE_BY_EN = {};
+const GAL_PALETTE_BY_ZH = {};
+GAL_PALETTE.forEach(function (p) { GAL_PALETTE_BY_EN[p.en] = p; GAL_PALETTE_BY_ZH[p.zh] = p; });
+// 旧 28 类 → 新 22 张（一个旧表情落到最接近的新立绘）
+const GAL_EMO_PROJECT = {
+    neutral: 'neutral',
+    joy: 'joy', amusement: 'joy', approval: 'joy',
+    love: 'love', caring: 'love', gratitude: 'love',
+    desire: 'desire', embarrassment: 'embarrassment', anger: 'anger',
+    annoyance: 'annoyance', disapproval: 'annoyance', disgust: 'annoyance',
+    sadness: 'sadness', grief: 'sadness', remorse: 'sadness', disappointment: 'sadness',
+    surprise: 'surprise', realization: 'surprise',
+    fear: 'fear', nervousness: 'fear',
+    pride: 'pride', admiration: 'pride',
+    confusion: 'confusion', curiosity: 'confusion',
+    relief: 'satisfaction', optimism: 'arousal', excitement: 'arousal',
+};
+// 新表情 en ← 旧 en 别名（兼容以前按英文名上传的差分/官方素材）
+const GAL_PALETTE_ALIAS = {
+    neutral: ['neutral', 'normal'],
+    joy: ['joy', 'amusement', 'approval'],
+    love: ['love', 'caring', 'gratitude'],
+    desire: ['desire'],
+    embarrassment: ['embarrassment'],
+    anger: ['anger'],
+    annoyance: ['annoyance', 'disapproval', 'disgust'],
+    sadness: ['sadness', 'grief', 'remorse', 'disappointment'],
+    surprise: ['surprise', 'realization'],
+    fear: ['fear', 'nervousness'],
+    pride: ['pride', 'admiration'],
+    confusion: ['confusion', 'curiosity'],
+    satisfaction: ['satisfaction', 'relief'],
+    arousal: ['arousal', 'excitement'], flirt: ['flirt', 'desire'], panting: ['panting', 'nervousness'],
+    begging: ['begging', 'desire'], daze: ['daze', 'realization'], indulgence: ['indulgence', 'love'],
+    climax: ['climax', 'excitement'], afterglow: ['afterglow', 'relief'], exhaustion: ['exhaustion', 'disappointment'],
+    // 旧 28 张英文文件 → 新 22 张的兜底关系（新中文文件存在时优先用新文件）
+    joy_old: [],
+};
+// 运行时精灵兜底：新表情没有专属文件时，借用最接近的旧英文名文件
+const GAL_SPRITE_FALLBACK = {
+    neutral: 'neutral', joy: 'joy', love: 'love', desire: 'desire', embarrassment: 'embarrassment',
+    anger: 'anger', annoyance: 'annoyance', sadness: 'sadness', surprise: 'surprise', fear: 'fear',
+    pride: 'pride', confusion: 'confusion', satisfaction: 'relief', arousal: 'excitement',
+    flirt: 'desire', panting: 'nervousness', begging: 'desire', daze: 'realization',
+    indulgence: 'love', climax: 'excitement', afterglow: 'relief', exhaustion: 'disappointment',
+};
+// 情欲场景上下文（只有在这种语境里，才会启用「动情/媚/喘息/索求/失神/沉溺/高潮/余韵/虚脱/满足」专属立绘）
+const GAL_NSFW_CONTEXT_RE = /(喘|呻吟|娇喘|身体|体内|下体|下腹|腰|腿|胸|乳|肉|穴|精|淫|湿|敏感|子宫|顶|射|高潮|痉挛|爱液|蜜|臀|舌|唇|喉|肉棒|肉刃|性器|情欲|发情|动情|媚|骚|浪叫|体液|水声|噗嗤|抽插|抽送|交合|插|舔|含|吞|吮|吻)/;
+const GAL_NSFW_OVERRIDES = [
+    { re: /高潮|绝顶|要去了|去了|痉挛|失控/, zh: '高潮', en: 'climax' },
+    { re: /余韵|余波|余味|回味|缓过(?:来|劲)|慢慢(?:平复|缓过来)/, zh: '余韵', en: 'afterglow' },
+    { re: /虚脱|脱力|瘫软|浑身无力|没力气|一点力气/, zh: '虚脱', en: 'exhaustion' },
+    { re: /失神|恍惚|大脑空白|眼神涣散|魂飞天外|失焦/, zh: '失神', en: 'daze' },
+    { re: /沉溺|沉沦|无法自拔|沉迷|沦陷/, zh: '沉溺', en: 'indulgence' },
+    { re: /索求|要更多|还想要|求你了|不要停|给我更多|再来一次/, zh: '索求', en: 'begging' },
+    { re: /喘息|娇喘|喘(?:着|息|气)|呼吸急促|上气不接下气/, zh: '喘息', en: 'panting' },
+    { re: /媚|撩|勾引|骚|浪|娇媚|风情/, zh: '媚', en: 'flirt' },
+    { re: /动情|情动|情欲|燥热|发热|心跳加速|渴望|想要/, zh: '动情', en: 'arousal' },
+    { re: /满足|餍足|喂饱|吃饱|舒服|安心/, zh: '满足', en: 'satisfaction' },
+];
+// 把旧 28 类情绪投影成用户 22 张立绘表情；在情欲语境下优先用专属表情
+function galProjectEmotion(emo, text) {
+    try {
+        const t = String(text || '');
+        const src = (emo && emo.src) || '';
+        if (t && GAL_NSFW_CONTEXT_RE.test(t)) {
+            for (const o of GAL_NSFW_OVERRIDES) {
+                if (o.re.test(t)) return { zh: o.zh, en: o.en, motion: (emo && emo.motion) || '', src: src, nsfw: true };
+            }
+        }
+        const oldEn = String((emo && emo.en) || 'neutral');
+        const newEn = GAL_EMO_PROJECT[oldEn] || 'neutral';
+        const p = GAL_PALETTE_BY_EN[newEn] || GAL_PALETTE_BY_EN.neutral;
+        return { zh: p.zh, en: p.en, motion: (emo && emo.motion) || '', src: src };
+    } catch (e) {
+        return { zh: '平静', en: 'neutral', motion: '', src: '' };
+    }
+}
+function galProjectLabel(label) {
+    const s = String(label || '').trim();
+    if (GAL_PALETTE_BY_ZH[s]) return GAL_PALETTE_BY_ZH[s];
+    if (GAL_PALETTE_BY_EN[s.toLowerCase()]) return GAL_PALETTE_BY_EN[s.toLowerCase()];
+    for (const m of GAL_EMO_MAP) {
+        if (m.en === s || m.zh === s) return galProjectEmotion({ zh: m.zh, en: m.en }, '');
+    }
+    for (const m of GAL_EMO_MAP) {
+        if (s.indexOf(m.zh) >= 0) return galProjectEmotion({ zh: m.zh, en: m.en }, '');
+    }
+    return null;
+}
+
 function galSpriteEmotion(text) {
     const t = String(text || '');
     // 1) 显式表情标记优先：【表情：笑】/（笑脸）/ [表情: anger] / #joy# / （微笑）
@@ -6184,7 +6285,7 @@ function galSpriteEmotion(text) {
     // 4) 动作 / 神态 / 标点兜底（Gemini 建议：小说里大部分情绪藏在动作里）
     const lex = galActionEmotion(t);
     if (lex) return { zh: lex.zh, en: lex.en, motion: lex.motion };
-    return { zh: 'normal', en: 'neutral' };
+    return { zh: '平静', en: 'neutral' };
 }
 
 // 动作/神态/标点 → 表情（Gemini 评审给的本地规则引擎，AI 失败时兜底）
@@ -6580,7 +6681,7 @@ function galBeatEmoLocal(text, seenNeutral) {
     const finalKeys = Object.keys(scores).filter(function (k) { return scores[k] > 0; });
     if (!finalKeys.length) {
         if (seenNeutral) seenNeutral.lastEmo = 'neutral';
-        return { zh: '正常', en: 'neutral', motion: '' };
+        return { zh: '平静', en: 'neutral', motion: '' };
     }
     const _cands = {};
     for (const k in scores) if (scores[k] > 0) _cands[k] = scores[k];
@@ -6589,7 +6690,14 @@ function galBeatEmoLocal(text, seenNeutral) {
     const hit = GAL_EMO_MAP.find(function (m) { return m.en === pick; });
     let motion = '';
     if (lex && lex.en === pick) motion = lex.motion || '';
-    return { zh: hit ? hit.zh : pick, en: pick, motion: motion, cands: _cands };
+    const disp = galProjectEmotion({ zh: hit ? hit.zh : pick, en: pick, motion: motion }, t);
+    const dispCands = {};
+    for (const k in _cands) {
+        const p = galProjectEmotion({ en: k }, t);
+        dispCands[p.en] = (dispCands[p.en] || 0) + _cands[k];
+    }
+    if (disp.nsfw) dispCands[disp.en] = Math.max(dispCands[disp.en] || 0, 8.0);
+    return { zh: disp.zh, en: disp.en, motion: disp.motion, src: 'local', cands: dispCands };
 }
 
 // 建时间轴（同步本地兜底 + 异步 AI 覆盖）
@@ -6635,34 +6743,36 @@ function galEnsureTimeline(st, speakers) {
 function galBeatEmo(tl, segIdx, beatIdx) {
     try {
         const info = tl && tl.byIdx && tl.byIdx[segIdx];
-        if (!info || !info.beats.length) return { zh: '正常', en: 'neutral' };
+        if (!info || !info.beats.length) return { zh: '平静', en: 'neutral' };
         const bi = Math.max(0, Math.min(info.beats.length - 1, beatIdx));
         const id = 's' + segIdx + '_b' + bi;
-        const local = info.locals[bi] || { zh: '正常', en: 'neutral' };
+        const beatText = info.beats[bi] ? String(info.beats[bi].text || '') : '';
+        const local = info.locals[bi] || { zh: '平静', en: 'neutral', cands: {} };
         const a = tl.emoAi && tl.emoAi[id];
         if (a && a.en) {
-            const beatText = info.beats[bi] ? info.beats[bi].text : '';
             const isDialogue = /[“"「『]/.test(beatText);
             const localEn = String(local.en || 'neutral');
             const conf = Number(a.conf) || 0.8;
             // 防幻觉：纯旁白 + 本地无表情，AI 给强负面 -> 判平静
             if (!isDialogue && localEn === 'neutral' && ['fear', 'grief', 'anger', 'remorse', 'disgust'].indexOf(a.en) >= 0) {
-                return { zh: '正常', en: 'neutral', motion: '' };
+                return { zh: '平静', en: 'neutral', motion: '', src: 'ai' };
             }
             if (conf >= 0.55 || localEn === 'neutral') {
-                return { zh: a.zh, en: a.en, motion: a.motion || '', conf: conf, src: 'ai' };
+                const disp = galProjectEmotion({ zh: a.zh, en: a.en, motion: a.motion || '' }, beatText);
+                return { zh: disp.zh, en: disp.en, motion: disp.motion || '', conf: conf, src: 'ai' };
             }
         }
-        return local ? { zh: local.zh, en: local.en, motion: local.motion || '', src: 'local' } : { zh: '正常', en: 'neutral' };
-    } catch (e) { return { zh: '正常', en: 'neutral' }; }
+        const disp2 = galProjectEmotion(local, beatText);
+        return { zh: disp2.zh, en: disp2.en, motion: disp2.motion || '', src: 'local', cands: local.cands || {} };
+    } catch (e) { return { zh: '平静', en: 'neutral' }; }
 }
 function galBeatEmoToEn(emo) { return String((emo && emo.en) || 'neutral'); }
 // 整条消息一次 AI 调用：返回 { sN_bM: {zh,en,motion} }
 function galFetchEmoTimeline(entries, cacheKey) {
     const cached = _emoTimelineCache[cacheKey];
     if (cached && (Date.now() - cached.t) < 10 * 60 * 1000) return Promise.resolve(cached.map || null);
-    const labels = GAL_EMO_MAP.map(function (m) { return m.en; });
-    const labelPairs = GAL_EMO_MAP.map(function (m) { return m.zh + '(' + m.en + ')'; }).join('、');
+    const labels = GAL_PALETTE.map(function (m) { return m.en; });
+    const labelPairs = GAL_PALETTE.map(function (m) { return m.zh + '(' + m.en + ')'; }).join('、');
     // 长消息不限 24 条：分批（每批 28 条）覆盖全部节拍，避免后半段全部掉回本地兜底
     const all = entries.slice(0, 140);
     const chunks = [];
@@ -6682,12 +6792,11 @@ function galFetchEmoTimeline(entries, cacheKey) {
             else if (raw && typeof raw === 'object') { e = raw.e || raw.emo || raw.emotion || raw.en; conf = Number(raw.conf || raw.confidence) || 0.8; mo = String(raw.m || raw.motion || ''); }
             e = String(e || '').toLowerCase().trim();
             if (!e) return;
-            let hit = null;
-            for (const m of GAL_EMO_MAP) { if (m.en === e || e === String(m.zh)) { hit = m; break; } }
-            if (!hit) { for (const m of GAL_EMO_MAP) { if (e.indexOf(m.zh) >= 0 || m.en.indexOf(e) >= 0) { hit = m; break; } } }
-            if (!hit) return;
-            mo = String(mo || '').toLowerCase();
-            map[String(id).trim()] = { zh: hit.zh, en: hit.en, conf: Math.max(0.2, Math.min(1, conf)), motion: (mo === 'jump' || mo === 'sink' || mo === 'shake') ? mo : '' };
+            const p = galProjectLabel(e);
+            if (p) {
+                mo = String(mo || '').toLowerCase();
+                map[String(id).trim()] = { zh: p.zh, en: p.en, conf: Math.max(0.2, Math.min(1, conf)), motion: (mo === 'jump' || mo === 'sink' || mo === 'shake') ? mo : '' };
+            }
         };
         if (Array.isArray(obj)) { for (const it of obj) { if (it && it.id) put(it.id, it); } }
         else if (obj && typeof obj === 'object') {
@@ -6700,7 +6809,7 @@ function galFetchEmoTimeline(entries, cacheKey) {
         const lines = chunk.map(function (e) { return e.id + '|' + (e.spk || '旁白') + '|' + String(e.text).replace(/\|/g, '/').slice(0, 80); }).join('\n');
         const prompt = [
             '你是视觉小说(Galgame)演出导演。为下面每个分句标注「画面主角此刻的立绘表情」。',
-            '可选表情（只能选这些英文标签，括号里是中文含义）：' + labelPairs + '。',
+            '可选表情（只能选这些标签，中文和英文都行）：' + labelPairs + '。',
             '导演铁律：',
             '1. 严禁滥用 neutral/desire：本批 neutral ≤15%；调戏/坏笑/逗弄 -> amusement 或 pride（不要用 joy）；终于完成/松口气 -> relief；盘算明天/约定以后 -> optimism；傲娇/被夸奖 -> embarrassment；鄙视/嫌弃 -> disgust/annoyance；自责 -> remorse；落空 -> disappointment；恍然大悟 -> realization。',
             '2. 纯环境描写、睡着、无情绪动作（例如「他睡着了」「走进房间」）-> 必须 neutral，绝不可乱贴 fear/sadness/anger。',
@@ -6749,7 +6858,7 @@ function galSetEmoBadge(emo, speaker, src) {
         const en = String((emo && emo.en) || '');
         if (!en) { el.classList.remove('on'); return; }
         let zh = String((emo && emo.zh) || '');
-        if (!zh || zh === 'normal') { const hit = GAL_EMO_MAP.find(function (m) { return m.en === en; }); zh = hit ? hit.zh : en; }
+        if (!zh || zh === 'normal') { const hit = GAL_PALETTE_BY_EN[en] || GAL_EMO_MAP.find(function (m) { return m.en === en; }); zh = hit ? hit.zh : en; }
         el.innerHTML = '🎭 表情：<b>' + esc(zh) + '</b><span style="opacity:.72">(' + esc(en) + ')</span>' +
             (speaker ? '<span style="opacity:.55">· ' + esc(speaker) + '</span>' : '') +
             (src ? '<span class="src">' + esc(src) + '</span>' : '');
@@ -6762,13 +6871,11 @@ function galHideEmoBadge() {
 // 应用某个节拍的表情（带动作微动画）
 // 整段表情：统计该段所有节拍的情绪，取出现最多的（平票取靠后的；若几乎全是 neutral 但有明确情绪则优先明确情绪）
 const GAL_AROUSAL_WEIGHT = {
-    neutral: 0.1, relief: 0.8, caring: 0.8, sadness: 0.8, disappointment: 0.8,
-    curiosity: 1.0, approval: 1.0, optimism: 1.0, gratitude: 1.0, remorse: 1.0, realization: 1.0,
-    amusement: 1.3, pride: 1.3, embarrassment: 1.3, excitement: 1.3, surprise: 1.3,
-    anger: 1.3, disgust: 1.3, fear: 1.3, desire: 1.1, joy: 1.0, grief: 1.0, love: 1.0,
-    admiration: 1.0, annoyance: 1.0, nervousness: 1.0, confusion: 1.0,
+    neutral: 0.8, joy: 1.15, love: 1.0, desire: 1.1, embarrassment: 1.25, anger: 1.3,
+    annoyance: 1.1, sadness: 0.9, surprise: 1.3, fear: 1.3, pride: 1.3, confusion: 1.0,
+    arousal: 1.35, flirt: 1.35, panting: 1.35, begging: 1.35, daze: 1.3, indulgence: 1.3,
+    climax: 1.45, afterglow: 1.2, exhaustion: 1.1, satisfaction: 1.15,
 };
-// ── 整段表情：候选集 + 段内随机挑选（稀有度加权），一段只出一个、同一段渲染稳定 ──
 function galSegmentDialogueInfo(info) {
     let hasDialogue = false, dialogueOnly = false;
     try {
@@ -6800,7 +6907,8 @@ function galSegmentCandidates(tl, segIdx) {
         const id = 's' + segIdx + '_b' + bi;
         if (tl.emoAi && tl.emoAi[id] && tl.emoAi[id].en) {
             const a = tl.emoAi[id];
-            beatScores[a.en] = (beatScores[a.en] || 0) + 4.5 * (Number(a.conf) || 0.8);
+            const ap = galProjectEmotion({ zh: a.zh, en: a.en }, text);
+            beatScores[ap.en] = (beatScores[ap.en] || 0) + 4.5 * (Number(a.conf) || 0.8);
         }
         let maxB = 0;
         for (const k in beatScores) maxB = Math.max(maxB, beatScores[k]);
@@ -6835,17 +6943,17 @@ function galSeedRng(str) {
 function galSegmentEmotionWeighted(tl, segIdx) {
     try {
         const cands = galSegmentCandidates(tl, segIdx);
-        if (!cands.length) return { zh: '正常', en: 'neutral' };
+        if (!cands.length) return { zh: '平静', en: 'neutral' };
         const en = cands[0][0];
-        const hit = GAL_EMO_MAP.find(function (m) { return m.en === en; });
-        return hit ? { zh: hit.zh, en: hit.en } : { zh: '正常', en: 'neutral' };
-    } catch (e) { return { zh: '正常', en: 'neutral' }; }
+        const hit = GAL_PALETTE_BY_EN[en];
+        return hit ? { zh: hit.zh, en: hit.en } : { zh: '平静', en: 'neutral' };
+    } catch (e) { return { zh: '平静', en: 'neutral' }; }
 }
 // 候选随机：按「稀有度」加权抽一个，同一段（同一条消息同一个 seg）结果稳定
 function galSegmentEmotion(tl, segIdx) {
     try {
         const cands = galSegmentCandidates(tl, segIdx);
-        if (!cands.length) return { zh: '正常', en: 'neutral' };
+        if (!cands.length) return { zh: '平静', en: 'neutral' };
         const pickMode = (function () { try { return String(settings().vnEmoPick || 'random'); } catch (e) { return 'random'; } })();
         let best = cands[0][0];
         if (pickMode !== 'weighted' && cands.length > 1) {
@@ -6873,8 +6981,8 @@ function galSegmentEmotion(tl, segIdx) {
                 try { galSchedCommit(best); } catch (e) { /* ignore */ }
             }
         }
-        const hit = GAL_EMO_MAP.find(function (m) { return m.en === best; });
-        return hit ? { zh: hit.zh, en: hit.en } : { zh: '正常', en: 'neutral' };
+        const hit = GAL_PALETTE_BY_EN[best];
+        return hit ? { zh: hit.zh, en: hit.en } : { zh: '平静', en: 'neutral' };
     } catch (e) { return galSegmentEmotionWeighted(tl, segIdx); }
 }
 function galApplyBeatEmotion(name, emo, segText) {
@@ -7026,9 +7134,19 @@ function galSpriteUrls(name, emo) {
     const add = function (u) { list.push(u + '.webp', u + '.png'); };
     if (zh !== 'normal') add(base + enc + '_' + encodeURIComponent(zh));
     if (en !== 'neutral') add(base + enc + '_' + encodeURIComponent(en));
+    for (const a of (GAL_PALETTE_ALIAS[en] || [])) {
+        if (a !== en) add(base + enc + '_' + encodeURIComponent(a));
+    }
+    const _fb = GAL_SPRITE_FALLBACK[en];
+    if (_fb && _fb !== en) add(base + enc + '_' + encodeURIComponent(_fb));
     add(base + enc);
     if (zh !== 'normal') add(base + enc + '/' + encodeURIComponent(zh));
     if (en !== 'neutral') add(base + enc + '/' + encodeURIComponent(en));
+    for (const a of (GAL_PALETTE_ALIAS[en] || [])) {
+        if (a !== en) add(base + enc + '/' + encodeURIComponent(a));
+    }
+    const _fb2 = GAL_SPRITE_FALLBACK[en];
+    if (_fb2 && _fb2 !== en) add(base + enc + '/' + encodeURIComponent(_fb2));
     add(base + enc + '/normal');
     // 默认素材包（_default/英文表情名.webp|png）——给没有专属立绘的角色兜底
     try {
@@ -7085,7 +7203,15 @@ async function galStSpriteResolve(name, emo) {
             list.forEach(function (it) {
                 if (it && it.label) map[String(it.label).toLowerCase()] = it.path;
             });
-            const hit = map[en] || map[zh] || map['neutral'] || map['normal'] || null;
+            let hit = map[en] || map[zh] || null;
+            if (!hit) {
+                for (const a of (GAL_PALETTE_ALIAS[en] || [])) { if (map[a]) { hit = map[a]; break; } }
+            }
+            if (!hit) {
+                const fb = GAL_SPRITE_FALLBACK[en];
+                if (fb && map[fb]) hit = map[fb];
+            }
+            if (!hit) hit = map['neutral'] || map['normal'] || null;
             if (hit) return { url: hit, avatar: false, custom: true, st: true };
         }
     } catch (e) { /* ignore */ }
@@ -7097,7 +7223,10 @@ async function galResolveSprite(name, emo) {
     try {
         const exprMap = (assetScope().spriteExpr || {})[String(name)] || {};
         const en0 = String((emo && emo.en) || 'neutral');
-        const ex = exprMap[en0];
+        let ex = exprMap[en0] || (emo && emo.zh ? exprMap[String(emo.zh)] : null);
+        if (!ex) {
+            for (const a of (GAL_PALETTE_ALIAS[en0] || [])) { if (exprMap[a]) { ex = exprMap[a]; break; } }
+        }
         if (ex) {
             const exUrl = typeof ex === 'string' ? ex : String(ex.url || '');
             if (exUrl) {
@@ -7718,7 +7847,7 @@ function renderAssetChars() {
         const sc = (function () { try { return assetScope(); } catch (e) { return { spriteMap: {}, spriteExpr: {} }; } })();
         const sm = sc.spriteMap || {};
         const sx = sc.spriteExpr || {};
-        const emoOpts = GAL_EMO_MAP.map(function (m) { return '<option value="' + esc(m.en) + '">' + esc(m.zh) + '（' + esc(m.en) + '）</option>'; }).join('') + '<option value="neutral">平静（neutral）</option>';
+        const emoOpts = GAL_PALETTE.map(function (m) { return '<option value="' + esc(m.zh) + '">' + esc(m.zh) + '（' + esc(m.en) + '）</option>'; }).join('');
         box.innerHTML = names.map(function (n) {
             const base = sm[n] ? (typeof sm[n] === 'string' ? sm[n] : String(sm[n].url || '')) : '';
             const exprs = sx[n] || {};
@@ -7796,24 +7925,39 @@ function renderAssetChars() {
                             const thumb = row.querySelector('div[style*="width:46px"]');
                             if (thumb) thumb.innerHTML = '<img src="' + esc(neutral) + '" style="width:100%;height:100%;object-fit:contain">';
                         }
-                        const known = GAL_EMO_MAP.slice();
-                        const knownEns = {};
-                        known.forEach(function (m) { knownEns[m.en] = true; });
-                        const extra = Object.keys(have).filter(function (k) { return !knownEns[k]; });
+                        const known = GAL_PALETTE.slice();
+                        const knownKeys = {};
+                        known.forEach(function (m) { knownKeys[m.en] = true; knownKeys[m.zh.toLowerCase()] = true; (GAL_PALETTE_ALIAS[m.en] || []).forEach(function (a) { knownKeys[a] = true; }); });
+                        const extra = Object.keys(have).filter(function (k) { return !knownKeys[k]; });
                         const total = known.length;
                         let upCount = 0;
-                        const chip = function (zh, en, url, on) {
+                        const chip = function (zh, en, url, on, borrowed) {
                             if (on) upCount++;
                             const st = on
-                                ? 'background:rgba(143,217,182,.16);border:1px solid rgba(143,217,182,.45);color:#cfe9dd'
+                                ? (borrowed
+                                    ? 'background:rgba(255,212,121,.10);border:1px solid rgba(255,212,121,.35);color:#e8d3a0'
+                                    : 'background:rgba(143,217,182,.16);border:1px solid rgba(143,217,182,.45);color:#cfe9dd')
                                 : 'background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.16);color:#6f8080';
-                            const title = on ? ('已上传：' + (url || ('characters/' + n + '/' + en + '.webp')) + '（点击预览）') : '未上传：' + en;
+                            const title = on
+                                ? (borrowed ? ('借用旧立绘：' + url + '（新上传 ' + zh + ' 后自动优先）') : ('已上传：' + (url || ('characters/' + n + '/' + en + '.webp')) + '（点击预览）'))
+                                : '未上传：' + zh + '（会先用旧立绘兜底）';
                             return '<span class="ac-emo-chip" data-name="' + esc(n) + '" data-en="' + esc(en) + '" data-url="' + esc(url) + '" data-has="' + (on ? '1' : '0') + '" title="' + esc(title) + '" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:11px;cursor:' + (on ? 'pointer' : 'default') + ';' + st + '">' +
-                                (on ? '✓ ' : '✗ ') + esc(zh) + '<span style="opacity:.65">(' + esc(en) + ')</span>' +
+                                (on ? (borrowed ? '↩ ' : '✓ ') : '✗ ') + esc(zh) + '<span style="opacity:.65">(' + esc(en) + ')</span>' +
                                 (on ? '<b class="ac-emo-del" data-name="' + esc(n) + '" data-en="' + esc(en) + '" title="从官方目录删除这个表情" style="cursor:pointer;color:#ff9a9a;font-weight:400;margin-left:2px">×</b>' : '') +
                                 '</span>';
                         };
-                        const chips2 = known.map(function (m) { return chip(m.zh, m.en, have[m.en] || '', !!have[m.en]); }).join('') +
+                        const chips2 = known.map(function (m) {
+                            let url = have[m.zh.toLowerCase()] || have[m.en] || '';
+                            let borrowed = false;
+                            if (!url) {
+                                for (const a of (GAL_PALETTE_ALIAS[m.en] || [])) { if (have[a]) { url = have[a]; borrowed = true; break; } }
+                            }
+                            if (!url) {
+                                const fb = GAL_SPRITE_FALLBACK[m.en];
+                                if (fb && have[fb]) { url = have[fb]; borrowed = true; }
+                            }
+                            return chip(m.zh, m.zh, url, !!url, borrowed);
+                        }).join('') +
                             extra.map(function (k) { return chip(k, k, have[k], true); }).join('');
                         const holder = row.querySelector('.ac-official-emo');
                         if (holder) {
@@ -8189,7 +8333,7 @@ function galUpdateSprite(speaker, segText, narration, forcedEmo) {
     if (speaker) {
         if (st.spriteCast.indexOf(speaker) < 0) st.spriteCast.push(speaker);
         st.lastSpeaker = speaker;
-        st.spriteEmo[speaker] = forcedEmo || galSpriteEmotion(segText);
+        st.spriteEmo[speaker] = forcedEmo || galProjectEmotion(galSpriteEmotion(segText), segText);
         try { if (forcedEmo || !(state.gal && state.gal.emoTimeline)) galSetEmoBadge(st.spriteEmo[speaker], speaker, (forcedEmo && forcedEmo.src) || ''); } catch (e) { /* ignore */ }
     }
     if (_scene && _scene.length) {
@@ -8268,7 +8412,7 @@ function galUpdateSprite(speaker, segText, narration, forcedEmo) {
     cast.forEach(function (nm) {
         const isMain = (nm === mainName);
         const sideIdx = isMain ? -1 : Math.max(0, sides.indexOf(nm));
-        const emo = (isMain && speaker) ? st.spriteEmo[nm] : (st.spriteEmo[nm] || { zh: 'normal', en: 'neutral' });
+        const emo = (isMain && speaker) ? st.spriteEmo[nm] : (st.spriteEmo[nm] || { zh: '平静', en: 'neutral' });
         galResolveSprite(nm, emo).then(function (hit) {
             let img = Array.from(wrap.children).find(function (el) { return el.dataset && el.dataset.name === nm; });
             if (!hit) { if (img) img.remove(); return; }
